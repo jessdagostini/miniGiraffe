@@ -1,0 +1,12 @@
+[submodule "deps/libhandlegraph"]
+	path = deps/libhandlegraph
+	url = git@github.com:vgteam/libhandlegraph.git
+[submodule "deps/gbwt"]
+	path = deps/gbwt
+	url = git@github.com:jltsiren/gbwt.git
+[submodule "deps/sdsl-lite"]
+	path = deps/sdsl-lite
+	url = git@github.com:vgteam/sdsl-lite.git
+[submodule "deps/gbwtgraph"]
+	path = deps/gbwtgraph
+	url = git@github.com:jltsiren/gbwtgraph.git

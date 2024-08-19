@@ -1,18 +1,17 @@
 CXX = g++
-#CXX = ~/esbmc/bin/esbmc
 CXXFLAGS = -fopenmp -O3 -g
 LDFLAGS = -shared
 LIBS = -lm
-INCLUDES = -I${HOME}/giraffe-proxy \
-           -I${HOME}/giraffe-proxy/deps/gbwtgraph/include \
-           -I${HOME}/giraffe-proxy/deps/gbwt/include \
-           -I${HOME}/giraffe-proxy/deps/sdsl-lite/include \
-           -I${HOME}/giraffe-proxy/deps/libhandlegraph/lib/usr/local/include
+INCLUDES = -I${HOME}/miniGiraffe \
+           -I${HOME}/miniGiraffe/deps/gbwtgraph/include \
+           -I${HOME}/miniGiraffe/deps/gbwt/include \
+           -I${HOME}/miniGiraffe/deps/sdsl-lite/include \
+           -I${HOME}/miniGiraffe/deps/libhandlegraph/lib/usr/local/include
 
-LIBS = -L${HOME}/giraffe-proxy/deps/sdsl-lite/lib \
-       -L${HOME}/giraffe-proxy/deps/gbwt/lib \
-       -L${HOME}/giraffe-proxy/deps/libhandlegraph/lib/usr/local/lib \
-       -L${HOME}/giraffe-proxy/deps/gbwtgraph/lib
+LIBS = -L${HOME}/miniGiraffe/deps/sdsl-lite/lib \
+       -L${HOME}/miniGiraffe/deps/gbwt/lib \
+       -L${HOME}/miniGiraffe/deps/libhandlegraph/lib/usr/local/lib \
+       -L${HOME}/miniGiraffe/deps/gbwtgraph/lib
 
 LDLIBS = -lgbwtgraph -lgbwt -lhandlegraph -lsdsl -ldivsufsort -ldivsufsort64
 

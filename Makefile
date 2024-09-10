@@ -1,5 +1,9 @@
+CLANGXX = clang++
+CLANGXXFLAGS = -O3 -g -fsanitize=address
+
 CXX = g++
-CXXFLAGS = -fopenmp -O3 -g
+CXXFLAGS = -fopenmp -fsanitize=address -O3 -g
+
 LDFLAGS = -shared
 LIBS = -lm
 INCLUDES = -I${HOME}/miniGiraffe \
@@ -30,9 +34,12 @@ main: main.cpp time-utils.so
 openmp: main-openmp.cpp time-utils.so perf-utils.so
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
 
+main-new: main-new.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
+
 check-input: check-input.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
 
 .PHONY: clean
 clean:
-	rm -f main openmp time-utils.so
+	rm -f main main-new openmp time-utils.so

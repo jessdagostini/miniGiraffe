@@ -156,10 +156,16 @@ int main(int argc, char *argv[]) {
     // Allocate memory for all structs
     allocate_source(data);
 
+    printf("Reading seeds\n");
+
     // Read data from dump
     load_seeds(filename_dump, data);
 
-    printf("Sequence [0] %s\n", data->sequence[0]);
+    GBZ gbz;
+    
+    printf("Reading gbz\n");
+    sdsl::simple_sds::load_from(gbz, filename_gbz);
+    const GBWTGraph* graph = &gbz.graph;
 
     // Free after usage
     free_source(data);

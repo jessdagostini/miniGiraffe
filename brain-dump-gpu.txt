@@ -1,0 +1,9 @@
+- Start going over match initial
+- Reestruct code to get a lot of reads+seeds pairs
+- Try to group seeds that are similar or maybe be closer in the graph
+- Create an array fo the GPU with only the offset size we are comparing for each case (probably needs to be 
+    something default because can have problems on indexing if it is dybamic)
+- Kernel will be the comparison operation
+- Can compare if this approach runs faster than the current approach (paralle for each sequence)
+- I can have a pointer for that data on the GPU that I dont need to bring back to perform the next step
+- Can have a "swap" variable to swap after each node processed (see merge-sort example)

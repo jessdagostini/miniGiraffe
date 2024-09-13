@@ -70,7 +70,7 @@ typedef struct {
 
 
 void allocate_source(source *data) {
-    data->max_size = 50000000;
+    data->max_size = 100000;
     data->seq_size = 151;
 
     // Allocate memory for the sequences array of array (array of strings)

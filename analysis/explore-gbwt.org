@@ -1,0 +1,208 @@
+#+TITLE: Exploring GBWT/Pangenome Graphs
+#+AUTHOR: Jessica Dagostini
+#+STARTUP: overview indent
+#+TAGS: noexport(n) deprecated(d)
+#+EXPORT_SELECT_TAGS: export
+#+EXPORT_EXCLUDE_TAGS: noexport
+#+SEQ_TODO: TODO(t!) STARTED(s!) WAITING(w!) | DONE(d!) CANCELLED(c!) DEFERRED(f!)
+
+* Yeast
+  #+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+yeast <- read_csv("./yeast_all.csv",
+             col_names=FALSE,
+             progress=FALSE,
+             col_types=cols()) %>%
+    rename(Node = X1, Outdegree = X2, Sequence = X3)
+problems(yeast)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+Warning message:
+One or more parsing issues, call `problems()` on your data frame for details, e.g.:
+  dat <- vroom(...)
+  problems(dat)
+
+# A tibble: 1,951,058 × 5
+     row   col expected  actual    file                                   
+   <int> <int> <chr>     <chr>     <chr>                                  
+ 1     3     5 4 columns 5 columns /home/jessica/miniGiraffe/yeast_all.csv
+ 2     7     5 4 columns 5 columns /home/jessica/miniGiraffe/yeast_all.csv
+ 3    19     5 4 columns 5 columns /home/jessica/miniGiraffe/yeast_all.csv
+ 4    21     5 4 columns 5 columns /home/jessica/miniGiraffe/yeast_all.csv
+ 5    23     5 4 columns 5 columns /home/jessica/miniGiraffe/yeast_all.csv
+ 6    25     5 4 columns 5 columns /home/jessica/miniGiraffe/yeast_all.csv
+ 7    27     5 4 columns 5 columns /home/jessica/miniGiraffe/yeast_all.csv
+ 8    29     6 4 columns 6 columns /home/jessica/miniGiraffe/yeast_all.csv
+ 9    30     5 4 columns 5 columns /home/jessica/miniGiraffe/yeast_all.csv
+10    33     5 4 columns 5 columns /home/jessica/miniGiraffe/yeast_all.csv
+# … with 1,951,048 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+  
+  #
+
+  #+begin_src R :results output :session *R* :exports both
+  yeast %>%
+      select(Node, Outdegree, Sequence) %>%
+      print() -> yeast_selected
+  #+end_src
+
+  #+RESULTS:
+  #+begin_example
+
+  # A tibble: 5,655,975 × 3
+      Node Outdegree Sequence                        
+     <dbl>     <dbl> <chr>                           
+   1     2         1 ACC                             
+   2     4         1 C                               
+   3     6         2 ACACCCACA                       
+   4     8         1 TGG                             
+   5    10         1 CA                              
+   6    12         1 GTGGG                           
+   7    14         2 T                               
+   8    16         1 G                               
+   9    18         1 CACACACCCACACACCACACCCACACCCACAC
+  10    20         1 CCACACCACACACCACACCACACCCACACCCA
+  # … with 5,655,965 more rows
+  # ℹ Use `print(n = ...)` to see more rows
+  #+end_example
+
+Expected nodes: 5.655.976
+
+#+begin_src R :results output :session *R* :exports both
+yeast_selected %>%
+    summarize(Total = n())
+#+end_src
+
+#+RESULTS:
+: 
+: # A tibble: 1 × 1
+:     Total
+:     <int>
+: 1 5655975
+
+Maybe missing one, or expected nodes is considering the end node?
+
+#+begin_src R :results output :session *R* :exports both
+yeast_selected %>%
+    summarize(Edges = sum(Outdegree))
+#+end_src
+
+#+RESULTS:
+: 
+: # A tibble: 1 × 1
+:     Edges
+:     <dbl>
+: 1 7732498
+
+#+begin_src R :results output :session *R* :exports both
+yeast_selected %>%
+    group_by(Outdegree) %>%
+    summarize(Total = n())
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+# A tibble: 14 × 2
+   Outdegree   Total
+       <dbl>   <int>
+ 1         1 3704917
+ 2         2 1835230
+ 3         3  107565
+ 4         4    7231
+ 5         5     816
+ 6         6     156
+ 7         7      30
+ 8         8      17
+ 9         9       7
+10        10       1
+11        11       2
+12        13       1
+13        15       1
+14        17       1
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+yeast_selected %>%
+    filter(Outdegree == 17)
+#+end_src
+
+#+RESULTS:
+: 
+: # A tibble: 1 × 3
+:    Node Outdegree Sequence
+:   <dbl>     <dbl> <chr>   
+: 1 12478        17 G
+
+#+begin_src R :results output :session *R* :exports both
+yeast %>%
+    filter(Outdegree == 17) %>%
+    select(X4) %>%
+    str_split_fixed(', ',17)
+#+end_src
+
+#+RESULTS:
+: 
+:      [,1]    [,2]    [,3]    [,4]    [,5]    [,6]    [,7]    [,8]    [,9]   
+: [1,] "12075" "12402" "12405" "12406" "12426" "12433" "12434" "12440" "12446"
+:      [,10]   [,11]   [,12]   [,13]   [,14]   [,15]   [,16]   [,17]  
+: [1,] "12449" "12451" "12452" "12455" "12457" "12463" "12475" "12476"
+
+#+begin_src R :results output :session *R* :exports both
+yeast_selected %>%
+    select(Sequence) %>%
+    mutate(Length = str_length(Sequence)) %>%
+    group_by(Length) %>%
+    summarize(Total = n()) %>%
+    print(n=32)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+# A tibble: 32 × 2
+   Length   Total
+    <int>   <int>
+ 1      1 3933610
+ 2      2  595262
+ 3      3  194447
+ 4      4  122307
+ 5      5  178575
+ 6      6   67838
+ 7      7   52440
+ 8      8  100673
+ 9      9   34738
+10     10   28164
+11     11   61820
+12     12   19875
+13     13   16393
+14     14   39547
+15     15   11829
+16     16    9930
+17     17   25775
+18     18    7719
+19     19    6293
+20     20   16905
+21     21    5046
+22     22    4130
+23     23   11618
+24     24    3444
+25     25    2805
+26     26    7826
+27     27    2327
+28     28    1975
+29     29    5428
+30     30    1662
+31     31    1415
+32     32   84159
+#+end_example
+
+If I set a default parameter, it will be a lot of useless memory. I
+believe the strategy to save the offset of the big string is still better.

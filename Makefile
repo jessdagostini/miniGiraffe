@@ -10,11 +10,11 @@ INCLUDES = -I${HOME}/miniGiraffe \
            -I${HOME}/miniGiraffe/deps/gbwtgraph/include \
            -I${HOME}/miniGiraffe/deps/gbwt/include \
            -I${HOME}/miniGiraffe/deps/sdsl-lite/include \
-           -I${HOME}/miniGiraffe/deps/libhandlegraph/lib/usr/local/include
+           -I${HOME}/miniGiraffe/deps/libhandlegraph/usr/local/include
 
 LIBS = -L${HOME}/miniGiraffe/deps/sdsl-lite/lib \
        -L${HOME}/miniGiraffe/deps/gbwt/lib \
-       -L${HOME}/miniGiraffe/deps/libhandlegraph/lib/usr/local/lib \
+       -L${HOME}/miniGiraffe/deps/libhandlegraph/usr/local/lib \
        -L${HOME}/miniGiraffe/deps/gbwtgraph/lib
 
 LDLIBS = -lgbwtgraph -lgbwt -lhandlegraph -lsdsl -ldivsufsort -ldivsufsort64

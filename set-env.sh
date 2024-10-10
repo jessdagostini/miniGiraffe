@@ -1,1 +1,1 @@
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/soe/jessicadagostini/miniGiraffe/deps/gbwt/lib:/soe/jessicadagostini/miniGiraffe/deps/libhandlegraph/lib/usr/local/lib:/soe/jessicadagostini/miniGiraffe/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/miniGiraffe/deps/gbwt/lib:$HOME/miniGiraffe/deps/libhandlegraph/usr/local/lib:$HOME/miniGiraffe/

@@ -537,7 +537,7 @@ bool trim_mismatches(GaplessExtension& extension, const gbwtgraph::GBWTGraph& gr
     return true;
 }
 
-void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* graph, vector<ExtensionResult>& full_result) {
+void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* graph, int element_index, ExtensionResult* full_result) {
     // cout << "Extending " << sequence << endl;
     vector<GaplessExtension> result;
     result.reserve(seeds.size());
@@ -724,12 +724,13 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
     //     cache = nullptr;
     // }
     
-    ExtensionResult local_result;
-    local_result.sequence = sequence;
-    for(auto r: result) {
-        local_result.extensions.push_back(r);
-    }
-    full_result.push_back(local_result);
+    full_result[element_index].sequence = sequence;
+    full_result[element_index].extensions = result;
+    cout << "Saving " << full_result[element_index].sequence << " on full result\n";
+
+    // for (int i = 0; i < result.size(); i++) {
+    //     full_result[element_index].extensions[i] = result[i];
+    // }
 }
 
 void write_extensions(vector<ExtensionResult> results) {
@@ -855,9 +856,9 @@ void parallel_enq(int chunk_size, int size, int tid, int num_threads) {
   }
 }
 
-void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, int size, int tid, int num_threads) {
+void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, ExtensionResult* full_result, int size, int tid, int num_threads) {
     for (int i = Q[tid].deq(); i != -1; i = Q[tid].deq()) {
-        extend(data[i].sequence, data[i].seeds, graph, full_result); 
+        extend(data[i].sequence, data[i].seeds, graph, i, full_result); 
     }
 
     std::printf("Thread %d finished it's local workload!\n", tid);
@@ -872,7 +873,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, int 
         std::printf("Thread %d helping thread %d\n", tid, target);
         int i;
         while ((i = Q[target].deq()) != -1) {
-            extend(data[i].sequence, data[i].seeds, graph, full_result);
+            extend(data[i].sequence, data[i].seeds, graph, i, full_result);
         }
 
         target = (target + 1) % num_threads; // Round robin.
@@ -898,22 +899,22 @@ int main(int argc, char *argv[]) {
     sdsl::simple_sds::load_from(gbz, filename_gbz);
     const GBWTGraph* graph = &gbz.graph;
 
-    ExtensionResult* full_result;
+    int size = data.size();
+
+    ExtensionResult* full_result = (ExtensionResult*)malloc(size * sizeof(ExtensionResult));
+    if (full_result == NULL) {
+        printf("Memory allocation failed!\n");
+        return 1;
+    }
     
-    // cout << "Starting mapping with " << batch_size << " batch size in " << num_threads << " threads" << endl;
-    
-    // Launch NUM_THREADS threads to intialize the IOQueues in Q with
-    // the indexes for each thread. Remember to initialize the Queues
-    // with the size that they will need. Join the threads afterwards.
-    int SIZE = data.size();
     thread* thread_array = new std::thread[num_threads];
-    int chunk_size = (SIZE + (num_threads - 1)) / num_threads;
+    int chunk_size = (size + (num_threads - 1)) / num_threads;
     for (int i = 0; i < num_threads; i++) {
         // Initialize local worklists.
         Q[i].init(chunk_size);
 
         // Launch threads to enqueue to local worklists.
-        thread_array[i] = std::thread(parallel_enq, chunk_size, SIZE, i, num_threads);
+        thread_array[i] = std::thread(parallel_enq, chunk_size, size, i, num_threads);
     }
 
     // Join.
@@ -923,7 +924,7 @@ int main(int argc, char *argv[]) {
 
     // Spawn threads to carry out work.
     for (int i = 0; i < num_threads; i++) {
-        thread_array[i] = std::thread(work_stealing, std::ref(data), graph, SIZE, i, num_threads);
+        thread_array[i] = std::thread(work_stealing, std::ref(data), graph, full_result, size, i, num_threads);
     }
 
     // Join.
@@ -937,7 +938,7 @@ int main(int argc, char *argv[]) {
     // }
     cout << "Finished mapping" << endl;
     cout << "Writing extensions" << endl;
-    write_extensions(full_result);
+    // write_extensions(full_result);
 
     return 0;
 }

@@ -11,6 +11,12 @@
 // #include "perf-event.hpp"
 // #include "perf-utils.h"
 
+// Vtune
+// #include <ittnotify.h>
+
+//Caliper
+// #include <caliper/cali.h>
+
 #ifdef USE_UNORDERED_SET
 #include <unordered_set>
 #elif USE_SET
@@ -540,7 +546,7 @@ void write_extensions(vector<ExtensionResult> results) {
     strftime(buffer, 80, "%Y%m%d%H%M", localtime(&now));
     string date_time(buffer);
 
-    string fileName = "/soe/jessicadagostini/giraffe-proxy/data/proxy_extensions_" + date_time + ".bin";
+    string fileName = "/soe/jessicadagostini/miniGiraffe/data/proxy_extensions_" + date_time + ".bin";
 
     // Create an output file stream
     std::ofstream outFile(fileName, std::ios::binary | std::ios::app);
@@ -609,9 +615,12 @@ void load_seeds(string filename, vector<Source> &data) {
         while (file.get(ch) && ch != '\0') {
             tmpData.sequence += ch;
         }
+        // cout << tmpData.sequence << endl;
         file.read(reinterpret_cast<char*>(&qnt), sizeof(qnt));
+        // std::cout << "Qnt " << qnt << endl;
         for(size_t i = 0; i < qnt; i++) {
             file.read(reinterpret_cast<char*>(&tmp), sizeof(seed_type));
+            // cout << tmp.second << endl;
 #ifdef USE_UNORDERED_SET
             tmpData.seeds.insert(tmp);
 #elif USE_SET
@@ -634,7 +643,7 @@ void load_seeds(string filename, vector<Source> &data) {
         
         data.push_back(tmpData);
         tmpData = Source();
-        // if (++q == 1024) {
+        // if (++q == 10) {
         //     break;
         // }
     }
@@ -648,6 +657,10 @@ int main(int argc, char *argv[]) {
     string filename_dump = argv[1];
     string filename_gbz = argv[2];
     int num_threads = atoi(argv[3]);
+    int batch_size = DEFAULT_PARALLEL_BATCHSIZE;
+    if (argv[4]!=NULL) {
+        batch_size = atoi(argv[4]);
+    }
 
     /* Timer begin */
     // double start = omp_get_wtime();
@@ -674,21 +687,35 @@ int main(int argc, char *argv[]) {
     // if (free_cache) {
     //     cache = new CachedGBWTGraph(*(graph));
     // }
-    cout << "Starting mapping" << endl;
+    cout << "Starting mapping with " << batch_size << " batch size" << endl;
+    cout << num_threads << endl;
     omp_set_num_threads(num_threads);
     // PerfEvent e;
+
+    // __itt_domain* domain = __itt_domain_create("Example.Domain.Global");
+    // // Create string handles which associates with the "main" task.
+    // __itt_string_handle* handle_main = __itt_string_handle_create("EXTENSION");
+    // __itt_resume();
+
+    // cali_config_set("CALI_CALIPER_ATTRIBUTE_DEFAULT_SCOPE", "process");
+
+    // CALI_MARK_BEGIN("main");
+    // CALI_MARK_BEGIN("parallel");    
 
     #pragma omp declare reduction (merge : std::vector<ExtensionResult> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
     vector<ExtensionResult> full_result;
 
     // e.startCounters();
-    #pragma omp parallel for shared(graph) schedule(dynamic, DEFAULT_PARALLEL_BATCHSIZE) reduction(merge: full_result)
+    #pragma omp parallel for shared(graph) schedule(dynamic, batch_size) reduction(merge: full_result)
     // #pragma omp parallel for shared(graph) reduction(merge: full_result)
     // #pragma omp parallel for shared(graph) schedule(dynamic, DEFAULT_PARALLEL_BATCHSIZE)
+    // Check on vtune if this can be a bottleneck
     for (auto d : data) {
+        // __itt_task_begin(domain, __itt_null, __itt_null, handle_main);
         double start = omp_get_wtime();
         // e.startCounters();
         // cout << d.sequence << endl;
+        // __itt_task_begin(domain, __itt_null, __itt_null, handle_main);
         vector<GaplessExtension> result; // structure to store the result
         result.reserve(d.seeds.size());
 
@@ -696,6 +723,7 @@ int main(int argc, char *argv[]) {
         for (seed_type seed : d.seeds) {
             /* Timer begin */
             // double start = omp_get_wtime();
+            // cout << "New seed" << endl;
             
             size_t node_offset = get_node_offset(seed);
             size_t read_offset = get_read_offset(seed);
@@ -895,12 +923,18 @@ int main(int argc, char *argv[]) {
         /** Time counter **/
         double end = omp_get_wtime();
         time_utils_add(start, end, 0, omp_get_thread_num());
+        // __itt_task_end(domain);
     }
+    cout << "Finished mapping" << endl;
+    // CALI_MARK_END("parallel");
+    // __itt_pause();
 
     /** Perf Counter **/
     // e.stopCounters();
     // for (unsigned i=0; i<e.names.size(); i++)
     //     perf_utils_add(e.events[i].readCounter(), i, omp_get_thread_num());
+
+    time_utils_dump();
 
     /* Timer begin */
     // start = omp_get_wtime();
@@ -908,9 +942,9 @@ int main(int argc, char *argv[]) {
     /* Timer end */
     // end = omp_get_wtime();
     // time_utils_add(start, end, 3, omp_get_thread_num());
-    
-    time_utils_dump();
+
     // perf_utils_dump();
+    // CALI_MARK_END("main");
 
     return 0;
 }

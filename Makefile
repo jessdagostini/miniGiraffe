@@ -36,7 +36,10 @@ main: main.cpp time-utils.so
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
 
 openmp: main-openmp.cpp time-utils.so perf-utils.so
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
+
+workstealing: main-workstealing.cpp time-utils.so perf-utils.so
+	$(CXX) -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
 
 main-new: main-new.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@

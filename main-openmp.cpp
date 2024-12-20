@@ -6,10 +6,10 @@
 #include <omp.h>
 #include <cstdlib>
 
-#include "time-utils.h"
+// #include "time-utils.h"
 
-// #include "perf-event.hpp"
-// #include "perf-utils.h"
+#include "perf-event.hpp"
+#include "perf-utils.h"
 
 // Vtune
 // #include <ittnotify.h>
@@ -537,7 +537,7 @@ bool trim_mismatches(GaplessExtension& extension, const gbwtgraph::GBWTGraph& gr
     return true;
 }
 
-void write_extensions(vector<ExtensionResult> results) {
+void write_extensions(ExtensionResult* results, int size) {
     // Specify the file name
     time_t now = time(0);
 
@@ -555,8 +555,11 @@ void write_extensions(vector<ExtensionResult> results) {
         std::cerr << "Error opening file: " << fileName << std::endl;
     }
 
-    for (auto& r : results) {
+    ExtensionResult r;
+
+    for(int i=0; i<size; i++) {
         // Write string to the file
+        r = results[i];
         outFile.write(r.sequence.c_str(), r.sequence.size() + 1); // Include null terminator
 
         // Write how many extensions we have
@@ -689,9 +692,7 @@ int main(int argc, char *argv[]) {
     // }
     cout << "Starting mapping with " << batch_size << " batch size" << endl;
     cout << num_threads << endl;
-    omp_set_num_threads(num_threads);
-    // PerfEvent e;
-
+    
     // __itt_domain* domain = __itt_domain_create("Example.Domain.Global");
     // // Create string handles which associates with the "main" task.
     // __itt_string_handle* handle_main = __itt_string_handle_create("EXTENSION");
@@ -702,18 +703,29 @@ int main(int argc, char *argv[]) {
     // CALI_MARK_BEGIN("main");
     // CALI_MARK_BEGIN("parallel");    
 
-    #pragma omp declare reduction (merge : std::vector<ExtensionResult> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
-    vector<ExtensionResult> full_result;
+    // #pragma omp declare reduction (merge : std::vector<ExtensionResult> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+    // vector<ExtensionResult> full_result;
+    // ExtensionResult local_result;
 
-    // e.startCounters();
-    #pragma omp parallel for shared(graph) schedule(dynamic, batch_size) reduction(merge: full_result)
+    int size = data.size();
+
+    ExtensionResult* full_result = (ExtensionResult*)malloc(size * sizeof(ExtensionResult));
+    if (full_result == NULL) {
+        printf("Memory allocation failed!\n");
+        return 1;
+    }
+
+    PerfEvent e;
+    e.startCounters();
+    omp_set_num_threads(num_threads);
+    // #pragma omp parallel for shared(graph) schedule(dynamic, batch_size) reduction(merge: full_result)
     // #pragma omp parallel for shared(graph) reduction(merge: full_result)
-    // #pragma omp parallel for shared(graph) schedule(dynamic, DEFAULT_PARALLEL_BATCHSIZE)
+    #pragma omp parallel for shared(graph, full_result) schedule(dynamic, batch_size)
     // Check on vtune if this can be a bottleneck
-    for (auto d : data) {
+    for (int i = 0; i < size; i++) {
+        auto d = data[i];
         // __itt_task_begin(domain, __itt_null, __itt_null, handle_main);
-        double start = omp_get_wtime();
-        // e.startCounters();
+        // double start = omp_get_wtime();
         // cout << d.sequence << endl;
         // __itt_task_begin(domain, __itt_null, __itt_null, handle_main);
         vector<GaplessExtension> result; // structure to store the result
@@ -909,20 +921,16 @@ int main(int argc, char *argv[]) {
         // }
 
         /** Perf Counter **/
-        // e.stopCounters();
-        // for (unsigned i=0; i<e.names.size(); i++)
-        //     perf_utils_add(e.events[i].readCounter(), i, omp_get_thread_num());
-        
-        ExtensionResult local_result;
-        local_result.sequence = d.sequence;
-        for(auto r: result) {
-            local_result.extensions.push_back(r);
-        }
-        full_result.push_back(local_result);
+        //e.stopCounters();
+        //for (unsigned j=0; j<e.names.size(); j++)
+        //    perf_utils_add(e.events[j].readCounter(), j, omp_get_thread_num());
+
+        full_result[i].sequence = d.sequence;
+        full_result[i].extensions = result;
 
         /** Time counter **/
-        double end = omp_get_wtime();
-        time_utils_add(start, end, 0, omp_get_thread_num());
+        // double end = omp_get_wtime();
+        // time_utils_add(start, end, 0, omp_get_thread_num());
         // __itt_task_end(domain);
     }
     cout << "Finished mapping" << endl;
@@ -930,20 +938,21 @@ int main(int argc, char *argv[]) {
     // __itt_pause();
 
     /** Perf Counter **/
-    // e.stopCounters();
-    // for (unsigned i=0; i<e.names.size(); i++)
+    e.stopCounters();
+    e.printReport(std::cout, 1);
+    //for (unsigned i=0; i<e.names.size(); i++)
     //     perf_utils_add(e.events[i].readCounter(), i, omp_get_thread_num());
 
-    time_utils_dump();
+    // time_utils_dump();
 
     /* Timer begin */
     // start = omp_get_wtime();
-    write_extensions(full_result);
+    // write_extensions(full_result, size);
     /* Timer end */
     // end = omp_get_wtime();
     // time_utils_add(start, end, 3, omp_get_thread_num());
 
-    // perf_utils_dump();
+    //perf_utils_dump();
     // CALI_MARK_END("main");
 
     return 0;

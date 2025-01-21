@@ -6,13 +6,14 @@
 #include <omp.h>
 #include <cstdlib>
 
-// #include "time-utils.h"
+#include "time-utils.h"
 
 // #include "perf-event.hpp"
 // #include "perf-utils.h"
 
 #include <atomic>
 #include <thread>
+#include <time.h>
 #include "IOQueue.h"
 
 #ifdef USE_UNORDERED_SET
@@ -50,7 +51,7 @@ constexpr static double OVERLAP_THRESHOLD = 0.8;
 constexpr static size_t MAX_MISMATCHES = 4;
 const uint64_t DEFAULT_PARALLEL_BATCHSIZE = 512;
 
-IOQueue Q[48];
+IOQueue Q[50];
 std::atomic_int finished_threads(0);
 
 struct Source {
@@ -726,14 +727,14 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
     
     full_result[element_index].sequence = sequence;
     full_result[element_index].extensions = result;
-    cout << "Saving " << full_result[element_index].sequence << " on full result\n";
+    // cout << "Saving " << full_result[element_index].sequence << " on full result\n";
 
     // for (int i = 0; i < result.size(); i++) {
     //     full_result[element_index].extensions[i] = result[i];
     // }
 }
 
-void write_extensions(vector<ExtensionResult> results) {
+void write_extensions(ExtensionResult* results, int size) {
     // Specify the file name
     time_t now = time(0);
 
@@ -751,8 +752,11 @@ void write_extensions(vector<ExtensionResult> results) {
         std::cerr << "Error opening file: " << fileName << std::endl;
     }
 
-    for (auto& r : results) {
+    ExtensionResult r;
+
+    for(int i=0; i<size; i++) {
         // Write string to the file
+        r = results[i];
         outFile.write(r.sequence.c_str(), r.sequence.size() + 1); // Include null terminator
 
         // Write how many extensions we have
@@ -848,6 +852,12 @@ void load_seeds(string filename, vector<Source> &data) {
     file.close();
 }
 
+double get_wall_time() {
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time); // or CLOCK_REALTIME
+    return time.tv_sec + time.tv_nsec / 1000000000.0;
+}
+
 void parallel_enq(int chunk_size, int size, int tid, int num_threads) {
   int start = chunk_size * tid;
   int end = std::min(start + chunk_size, size); // Make sure we don't index out of array.
@@ -856,12 +866,20 @@ void parallel_enq(int chunk_size, int size, int tid, int num_threads) {
   }
 }
 
-void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, ExtensionResult* full_result, int size, int tid, int num_threads) {
-    for (int i = Q[tid].deq(); i != -1; i = Q[tid].deq()) {
-        extend(data[i].sequence, data[i].seeds, graph, i, full_result); 
+void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, ExtensionResult* full_result, int batchsize, int tid, int num_threads) {
+    // int batch[batchsize];
+    int* batch = (int*)malloc(batchsize * sizeof(int));
+    for (int r = Q[tid].deq_batch(batch, batchsize); r != -1; r = Q[tid].deq_batch(batch, batchsize)) {
+        for (int j=0; j<batchsize; j++) {
+            int i = batch[j];
+            double start = get_wall_time();
+            extend(data[i].sequence, data[i].seeds, graph, i, full_result);
+            double end = get_wall_time();
+            time_utils_add(start, end, 5, tid);
+        }
     }
 
-    std::printf("Thread %d finished it's local workload!\n", tid);
+    // std::printf("Thread %d finished it's local workload!\n", tid);
     finished_threads.fetch_add(1);
 
     // Steal tasks from other worklists.
@@ -870,10 +888,16 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
         if (target == tid) {
             target = (target + 1) % num_threads;
         }
-        std::printf("Thread %d helping thread %d\n", tid, target);
-        int i;
-        while ((i = Q[target].deq()) != -1) {
-            extend(data[i].sequence, data[i].seeds, graph, i, full_result);
+        // std::printf("Thread %d helping thread %d\n", tid, target);
+        int r;
+        while ((r = Q[target].deq_batch(batch, batchsize)) != -1) {
+            for(int j=0; j<batchsize; j++) {
+                int i = batch[j];
+                double start = get_wall_time();
+                extend(data[i].sequence, data[i].seeds, graph, i, full_result);
+                double end = get_wall_time();
+                time_utils_add(start, end, 5, tid);
+            }
         }
 
         target = (target + 1) % num_threads; // Round robin.
@@ -888,9 +912,9 @@ int main(int argc, char *argv[]) {
     string filename_dump = argv[1];
     string filename_gbz = argv[2];
     int num_threads = atoi(argv[3]);
-    // if (argv[4]!=NULL) {
-    //     batch_size = atoi(argv[4]);
-    // }
+    if (argv[4]!=NULL) {
+        batch_size = atoi(argv[4]);
+    }
 
     load_seeds(filename_dump, data);
     
@@ -906,6 +930,8 @@ int main(int argc, char *argv[]) {
         printf("Memory allocation failed!\n");
         return 1;
     }
+
+    cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << endl;
     
     thread* thread_array = new std::thread[num_threads];
     int chunk_size = (size + (num_threads - 1)) / num_threads;
@@ -924,7 +950,7 @@ int main(int argc, char *argv[]) {
 
     // Spawn threads to carry out work.
     for (int i = 0; i < num_threads; i++) {
-        thread_array[i] = std::thread(work_stealing, std::ref(data), graph, full_result, size, i, num_threads);
+        thread_array[i] = std::thread(work_stealing, std::ref(data), graph, full_result, batch_size, i, num_threads);
     }
 
     // Join.
@@ -938,7 +964,8 @@ int main(int argc, char *argv[]) {
     // }
     cout << "Finished mapping" << endl;
     cout << "Writing extensions" << endl;
-    // write_extensions(full_result);
+    time_utils_dump();
+    // write_extensions(full_result, size);
 
     return 0;
 }

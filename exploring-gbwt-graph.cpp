@@ -35,25 +35,25 @@ int main(int argc, char *argv[]) {
             gbwt::CachedGBWT cache = graph->get_single_cache();
             gbwt::size_type cache_index = cache.findRecord(curr);
             // printf("[%ld/%lld] Outdegree: %ld\n", curr, max, cache.outdegree(cache_index));
-            cout << curr << ", " << cache.outdegree(cache_index) << ", " << graph->get_sequence(handle);
+            // cout << "Iterator " << i << " Node: " << curr << ", " << cache.outdegree(cache_index) << ", " << graph->get_sequence(handle);
 
             for(gbwt::rank_type outrank = 0; outrank < cache.outdegree(cache_index); outrank++)
             {
                 gbwt::node_type next = cache.successor(cache_index, outrank);
-                cout << ", " << next;
+                // cout << ", " << next;
             }
-            cout << endl;
+            // cout << endl;
 
 
-            // edges += outdegree;
+            edges += cache.outdegree(cache_index);
         } else {
             false_nodes++;
         }
         // printf("[%lld/%lld] Outdegree: %ld\n", i, max, outdegree);
     }
 
-    // cout << "False nodes: " << false_nodes << endl;
-    // cout << "Total edges: " << edges << endl;
+    cout << "False nodes: " << false_nodes << endl;
+    cout << "Total edges: " << edges << endl;
     // handle_t handle = graph->get_handle(291742533);
     // cout << graph->get_sequence(handle) << endl;
 

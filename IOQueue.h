@@ -35,14 +35,24 @@ class IOQueue {
     return buffer[data_index];
   }
 
-  int deq_32(int ret[32]) {
-    // Check if there's 32 items to dequeue.
-    if (end.load() - front.load() < 32) {
+  int deq_batch(int* ret, int batchsize) {
+    int data_index;
+    // Check if there's batchsize items to dequeue. If there's less than that, send what is missing. If there is 0 or negative number, return -1
+    if (end.load() - front.load() <= 0) {
       return -1;
+    } 
+    
+    if (end.load() - front.load() < batchsize) {
+      int leftover = end.load() - front.load();
+      data_index = front.fetch_add(leftover);
+      for (int i = 0; i < leftover; i++) {
+        ret[i] = buffer[data_index + i];
+      }
+      return 0;
     }
 
-    int data_index = front.fetch_add(32);
-    for (int i = 0; i < 32; i++) {
+    data_index = front.fetch_add(batchsize);
+    for (int i = 0; i < batchsize; i++) {
       ret[i] = buffer[data_index + i];
     } 
 

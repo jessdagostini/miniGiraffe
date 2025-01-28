@@ -8,7 +8,7 @@ pthread_rwlock_t lock_time_utils;
 
 // For gbwt_extender
 // char names[10][40] = {"cycles", "kcycles", "instructions", "L1-acess", "L1-misses", "LL-access", "LL-misses", "LLC-misses", "branch-misses", "task-clock"};
-char names[10][40] = {"branch-issued", "branch-misses"};
+char names[10][40] = {"LL-access", "LL-misses"};
 
 void perf_utils_dump() {
     // fprintf(stderr, "Entrou dump\n");

@@ -15,7 +15,7 @@ pthread_rwlock_t lock_time_utils;
 // char regions[10][40] = {"omp-loop"};
 
 // For proxy
-char regions[10][40] = {"omp-loop", "reading-seeds", "reading-gbz", "writing-output", "seeds-loop"};
+char regions[10][40] = {"omp-loop", "reading-seeds", "reading-gbz", "writing-output", "seeds-loop", "extension"};
 
 void time_utils_dump() {
     // fprintf(stderr, "Entrou dump\n");

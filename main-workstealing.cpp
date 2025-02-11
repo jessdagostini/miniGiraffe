@@ -49,6 +49,7 @@ static constexpr double default_gc_content = 0.5;
 constexpr static double OVERLAP_THRESHOLD = 0.8;
 constexpr static size_t MAX_MISMATCHES = 4;
 const uint64_t DEFAULT_PARALLEL_BATCHSIZE = 512;
+const uint32_t INFINITY_MISMATCHES = 1000000;
 
 IOQueue Q[50];
 atomic_int finished_threads(0);
@@ -200,54 +201,13 @@ vector<gbwtgraph::handle_t> get_path(const vector<gbwtgraph::handle_t>& vec, gbw
     return result;
 }
 
-// vector<handle_t> get_path(const vector<handle_t>& first, handle_t second) {
-//     vector<handle_t> result;
-//     result.reserve(first.size() + 1);
-//     result.insert(result.end(), first.begin(), first.end());
-//     result.push_back(second);
-//     return result;
-// }
-
-// vector<handle_t> get_path(handle_t first, const vector<handle_t>& second) {
-//     vector<handle_t> result;
-//     result.reserve(second.size() + 1);
-//     result.push_back(first);
-//     result.insert(result.end(), second.begin(), second.end());
-//     return result;
-// }
-
-void match_initial(GaplessExtension& match, const string& seq, gbwtgraph::view_type target) {
-    size_t node_offset = match.offset;
-    size_t left = min(seq.length() - match.read_interval.second, target.second - node_offset);
-    
-    while (left > 0) {
-        size_t len = min(left, sizeof(uint64_t)); // Number of bytes to be copied
-        uint64_t a = 0, b = 0; // 8 bytes
-        memcpy(&a, seq.data() + match.read_interval.second, len); // Setting the pointer on seq.data to slot where to start and copying len bytes
-        memcpy(&b, target.first + node_offset, len); // Setting the pointer in the node offset, copying len bytes
-        if (a == b) { // byte comparision
-            match.read_interval.second += len;
-            node_offset += len;
-        } else {
-            for (size_t i = 0; i < len; i++) {
-                if (seq[match.read_interval.second] != target.first[node_offset]) {
-                    match.internal_score++;
-                }
-                match.read_interval.second++;
-                node_offset++;
-            }
-        }
-        left -= len;
-    }
-    match.old_score = match.internal_score;
-}
-
 // Match forward but stop before the mismatch count reaches the limit.
 // Updates internal_score; use set_score() to recompute score.
 // Returns the tail offset (the number of characters matched).
 size_t match_forward(GaplessExtension& match, const string& seq, gbwtgraph::view_type target, uint32_t mismatch_limit) {
-    size_t node_offset = 0;
+    size_t node_offset = (mismatch_limit == INFINITY_MISMATCHES) ? match.offset : 0; // if I pass an infinity mismatch limit, I know that I need an node_offset using match.offset
     size_t left = min(seq.length() - match.read_interval.second, target.second - node_offset);
+
     while (left > 0) {
         size_t len = min(left, sizeof(uint64_t));
         uint64_t a = 0, b = 0;
@@ -259,7 +219,7 @@ size_t match_forward(GaplessExtension& match, const string& seq, gbwtgraph::view
         } else {
             for (size_t i = 0; i < len; i++) {
                 if (seq[match.read_interval.second] != target.first[node_offset]) {
-                    if (match.internal_score + 1 >= mismatch_limit) {
+                    if (match.internal_score + 1 >= mismatch_limit) { // if we passed the mismatch limit, return
                         return node_offset;
                     }
                     match.internal_score++;
@@ -271,6 +231,7 @@ size_t match_forward(GaplessExtension& match, const string& seq, gbwtgraph::view
         left -= len;
     }
 
+    if (mismatch_limit == INFINITY_MISMATCHES) match.old_score = match.internal_score;
     return node_offset;
 }
 
@@ -621,7 +582,7 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
             false, false, static_cast<uint32_t>(0), static_cast<uint32_t>(0)
         };
         
-        match_initial(match, sequence, graph->get_sequence_view(seed.first));
+        size_t nd_of = match_forward(match, sequence, graph->get_sequence_view(seed.first), INFINITY_MISMATCHES);
         if (match.read_interval.first == 0) {
             match.left_full = true;
             match.left_maximal = true;

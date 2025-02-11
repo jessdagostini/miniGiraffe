@@ -63,21 +63,21 @@ struct GaplessExtension {
     // string sequence;
      // In the graph.
     vector<gbwtgraph::handle_t>     path;
-    size_t                    offset;
-    gbwt::BidirectionalState  state;
+    size_t                          offset;
+    gbwt::BidirectionalState        state;
 
     // In the read.
-    pair<size_t, size_t> read_interval; // where to start when going backward (first) and forward (second) 
-    vector<size_t>       mismatch_positions;
+    pair<size_t, size_t>            read_interval; // where to start when going backward (first) and forward (second) 
+    vector<size_t>                  mismatch_positions;
 
     // Alignment properties.
-    int32_t                   score;
-    bool                      left_full, right_full;
+    int32_t                         score;
+    bool                            left_full, right_full;
 
     // For internal use.
-    bool                      left_maximal, right_maximal;
-    uint32_t                  internal_score; // Total number of mismatches.
-    uint32_t                  old_score;      // Mismatches before the current flank.
+    bool                            left_maximal, right_maximal;
+    uint32_t                        internal_score; // Total number of mismatches.
+    uint32_t                        old_score;      // Mismatches before the current flank.
 
     bool full() const { return (this->left_full & this->right_full); }
 
@@ -148,6 +148,20 @@ struct GaplessExtension {
             }
         }
         return result;
+    }
+
+    // Use this function to copy another extension object
+    void clone(const GaplessExtension& another) {
+        this->offset = another.offset;
+        this->state = another.state;
+        this->read_interval = another.read_interval;
+        this->score = another.score;
+        this->left_full = another.left_full;
+        this->right_full = another.right_full;
+        this->left_maximal = another.left_maximal;
+        this->right_maximal = another.right_maximal;
+        this->internal_score = another.internal_score;
+        this->old_score = another.old_score;
     }
 };
 
@@ -391,12 +405,9 @@ void set_score(GaplessExtension& extension) {
 }
 
 bool process_next_state(const gbwt::BidirectionalState& next_state, GaplessExtension& curr, string sequence, const gbwtgraph::GBWTGraph* graph, uint32_t mismatch_limit, priority_queue<GaplessExtension>& extensions, size_t& num_extensions, bool& found_extension, HandlePosition direction) {
-    GaplessExtension next {
-        { }, curr.offset, next_state,
-        curr.read_interval, { },
-        curr.score, curr.left_full, curr.right_full,
-        curr.left_maximal, curr.right_maximal, curr.internal_score, curr.old_score
-    };
+    GaplessExtension next;
+    next.clone(curr);
+    next.state = next_state;
 
     gbwtgraph::handle_t handle;
     size_t node_offset = 0;

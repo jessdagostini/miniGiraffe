@@ -25,10 +25,9 @@
 #endif
 
 using namespace std;
-using namespace gbwtgraph;
 
 // typedef struct { char data[sizeof(long long int)]; } handle_t;
-typedef pair<handle_t, int64_t> seed_type;
+typedef pair<gbwtgraph::handle_t, int64_t> seed_type;
 
 #ifdef USE_UNORDERED_SET
 typedef unordered_set<seed_type> pair_hash_set;
@@ -52,7 +51,7 @@ constexpr static size_t MAX_MISMATCHES = 4;
 const uint64_t DEFAULT_PARALLEL_BATCHSIZE = 512;
 
 IOQueue Q[50];
-std::atomic_int finished_threads(0);
+atomic_int finished_threads(0);
 
 struct Source {
     string sequence;
@@ -63,13 +62,13 @@ struct GaplessExtension {
     // For proxy
     // string sequence;
      // In the graph.
-    std::vector<handle_t>     path;
+    vector<gbwtgraph::handle_t>     path;
     size_t                    offset;
     gbwt::BidirectionalState  state;
 
     // In the read.
-    std::pair<size_t, size_t> read_interval; // where to start when going backward (first) and forward (second) 
-    std::vector<size_t>       mismatch_positions;
+    pair<size_t, size_t> read_interval; // where to start when going backward (first) and forward (second) 
+    vector<size_t>       mismatch_positions;
 
     // Alignment properties.
     int32_t                   score;
@@ -101,14 +100,14 @@ struct GaplessExtension {
         return !(this->operator==(another));
     }
 
-    bool contains(const HandleGraph& graph, seed_type seed, size_t node_offset, size_t read_offset) const {
-        handle_t expected_handle = seed.first;
+    bool contains(const gbwtgraph::HandleGraph& graph, seed_type seed, size_t node_offset, size_t read_offset) const {
+        gbwtgraph::handle_t expected_handle = seed.first;
         size_t expected_node_offset = node_offset;
         size_t expected_read_offset = read_offset;
 
         size_t new_read_offset = this->read_interval.first;
         size_t new_node_offset = this->offset;
-        for (handle_t handle : this->path) {
+        for (gbwtgraph::handle_t handle : this->path) {
             size_t len = graph.get_length(handle) - new_node_offset;
             new_read_offset += len;
             new_node_offset += len;
@@ -128,7 +127,7 @@ struct GaplessExtension {
         size_t this_offset = this->offset, another_offset = another.offset;
         while (this_pos < this->read_interval.second && another_pos < another.read_interval.second) {
             if (this_pos == another_pos && *this_iter == *another_iter && this_offset == another_offset) {
-                size_t len = std::min({ graph.get_length(*this_iter) - this_offset,
+                size_t len = min({ graph.get_length(*this_iter) - this_offset,
                                         this->read_interval.second - this_pos,
                                         another.read_interval.second - another_pos });
                 result += len;
@@ -172,8 +171,8 @@ enum class HandlePosition {
     Backward
 };
 
-vector<handle_t> get_path(const vector<handle_t>& vec, handle_t handle, HandlePosition pos) {
-    vector<handle_t> result;
+vector<gbwtgraph::handle_t> get_path(const vector<gbwtgraph::handle_t>& vec, gbwtgraph::handle_t handle, HandlePosition pos) {
+    vector<gbwtgraph::handle_t> result;
     result.reserve(vec.size() + 1);
 
     if (pos == HandlePosition::Backward) {
@@ -203,26 +202,20 @@ vector<handle_t> get_path(const vector<handle_t>& vec, handle_t handle, HandlePo
 //     return result;
 // }
 
-void match_initial(GaplessExtension& match, const std::string& seq, gbwtgraph::view_type target) {
+void match_initial(GaplessExtension& match, const string& seq, gbwtgraph::view_type target) {
     size_t node_offset = match.offset;
-    size_t left = std::min(seq.length() - match.read_interval.second, target.second - node_offset);
-    // cout << "Seq length: " << seq.length() << endl;
-    // cout << "Read_interval.second: " << match.read_interval.second << endl;
-    // cout << "Targer.second: " << target.second << endl;
-    // cout << "Node offset: " << node_offset << endl;
+    size_t left = min(seq.length() - match.read_interval.second, target.second - node_offset);
+    
     while (left > 0) {
-        // cout << "Left: " << left << endl;
-        size_t len = std::min(left, sizeof(std::uint64_t)); // Number of bytes to be copied
-        std::uint64_t a = 0, b = 0; // 8 bytes
-        std::memcpy(&a, seq.data() + match.read_interval.second, len); // Setting the pointer on seq.data to slot where to start and copying len bytes
-        std::memcpy(&b, target.first + node_offset, len); // Setting the pointer in the node offset, copying len bytes
-        // cout << a << " " << b << endl;
+        size_t len = min(left, sizeof(uint64_t)); // Number of bytes to be copied
+        uint64_t a = 0, b = 0; // 8 bytes
+        memcpy(&a, seq.data() + match.read_interval.second, len); // Setting the pointer on seq.data to slot where to start and copying len bytes
+        memcpy(&b, target.first + node_offset, len); // Setting the pointer in the node offset, copying len bytes
         if (a == b) { // byte comparision
             match.read_interval.second += len;
             node_offset += len;
         } else {
             for (size_t i = 0; i < len; i++) {
-                // cout << "[INITIAL] Seq: " << seq[match.read_interval.second] << " Target: " << target.first[node_offset] << endl;
                 if (seq[match.read_interval.second] != target.first[node_offset]) {
                     match.internal_score++;
                 }
@@ -238,24 +231,21 @@ void match_initial(GaplessExtension& match, const std::string& seq, gbwtgraph::v
 // Match forward but stop before the mismatch count reaches the limit.
 // Updates internal_score; use set_score() to recompute score.
 // Returns the tail offset (the number of characters matched).
-size_t match_forward(GaplessExtension& match, const std::string& seq, gbwtgraph::view_type target, uint32_t mismatch_limit) {
+size_t match_forward(GaplessExtension& match, const string& seq, gbwtgraph::view_type target, uint32_t mismatch_limit) {
     size_t node_offset = 0;
-    size_t left = std::min(seq.length() - match.read_interval.second, target.second - node_offset);
+    size_t left = min(seq.length() - match.read_interval.second, target.second - node_offset);
     while (left > 0) {
-        size_t len = std::min(left, sizeof(std::uint64_t));
-        std::uint64_t a = 0, b = 0;
-        std::memcpy(&a, seq.data() + match.read_interval.second, len);
-        std::memcpy(&b, target.first + node_offset, len);
-        // cout << a << " " << b << endl;
+        size_t len = min(left, sizeof(uint64_t));
+        uint64_t a = 0, b = 0;
+        memcpy(&a, seq.data() + match.read_interval.second, len);
+        memcpy(&b, target.first + node_offset, len);
         if (a == b) {
             match.read_interval.second += len;
             node_offset += len;
         } else {
             for (size_t i = 0; i < len; i++) {
-                // cout << "[FORWARD] Seq: " << seq[match.read_interval.second] << " Target: " << target.first[node_offset] << endl;
                 if (seq[match.read_interval.second] != target.first[node_offset]) {
                     if (match.internal_score + 1 >= mismatch_limit) {
-                        // cout << "If: " << node_offset << std::endl;
                         return node_offset;
                     }
                     match.internal_score++;
@@ -266,23 +256,22 @@ size_t match_forward(GaplessExtension& match, const std::string& seq, gbwtgraph:
         }
         left -= len;
     }
-    // cout << "Full return " << node_offset << std::endl;
+
     return node_offset;
 }
 
-void match_backward(GaplessExtension& match, const std::string& seq, gbwtgraph::view_type target, uint32_t mismatch_limit) {
-    size_t left = std::min(match.read_interval.first, match.offset);
+void match_backward(GaplessExtension& match, const string& seq, gbwtgraph::view_type target, uint32_t mismatch_limit) {
+    size_t left = min(match.read_interval.first, match.offset);
     while (left > 0) {
-        size_t len = std::min(left, sizeof(std::uint64_t));
-        std::uint64_t a = 0, b = 0;
-        std::memcpy(&a, seq.data() + match.read_interval.first - len, len);
-        std::memcpy(&b, target.first + match.offset - len, len);
+        size_t len = min(left, sizeof(uint64_t));
+        uint64_t a = 0, b = 0;
+        memcpy(&a, seq.data() + match.read_interval.first - len, len);
+        memcpy(&b, target.first + match.offset - len, len);
         if (a == b) {
             match.read_interval.first -= len;
             match.offset -= len;
         } else {
             for (size_t i = 0; i < len; i++) {
-                // cout << "[BACKWARD] Seq: " << seq[match.read_interval.first - 1] << " Target: " << target.first[match.offset] << endl;
                 if (seq[match.read_interval.first - 1] != target.first[match.offset - 1]) {
                     if (match.internal_score + 1 >= mismatch_limit) {
                         return;
@@ -300,25 +289,13 @@ void match_backward(GaplessExtension& match, const std::string& seq, gbwtgraph::
 // Sort full-length extensions by internal_score, remove ones that are not
 // full-length alignments, remove duplicates, and return the best extensions
 // that have sufficiently low overlap.
-void handle_full_length(const gbwtgraph::GBWTGraph& graph, std::vector<GaplessExtension>& result, double overlap_threshold) {
-    std::sort(result.begin(), result.end(), [](const GaplessExtension& a, const GaplessExtension& b) -> bool {
+void handle_full_length(const gbwtgraph::GBWTGraph& graph, vector<GaplessExtension>& result, double overlap_threshold) {
+    sort(result.begin(), result.end(), [](const GaplessExtension& a, const GaplessExtension& b) -> bool {
         if (a.full() && b.full()) {
             return (a.internal_score < b.internal_score);
         }
         return a.full();
     });
-
-    // Debug
-    // cout << "handle_full_length" << endl;
-    // for (size_t i = 0; i < result.size(); i++) {
-    //     cout << result[i].offset << " " << result[i].score << " " << result[i].read_interval.first << " " << result[i].read_interval.second;
-    //     vector<size_t>::iterator mit;
-    //     for (mit = result[i].mismatch_positions.begin(); mit != result[i].mismatch_positions.end(); mit++) {
-    //         cout << " " << *mit;
-    //     }
-    //     cout << endl;
-    // }
-    // cout << endl;
 
     size_t tail = 0;
     for (size_t i = 0; i < result.size(); i++) {
@@ -336,7 +313,7 @@ void handle_full_length(const gbwtgraph::GBWTGraph& graph, std::vector<GaplessEx
             continue;
         }
         if (i > tail) {
-            result[tail] = std::move(result[i]);
+            result[tail] = move(result[i]);
         }
         tail++;
     }
@@ -344,7 +321,7 @@ void handle_full_length(const gbwtgraph::GBWTGraph& graph, std::vector<GaplessEx
 }
 
 // Sort the extensions from left to right. Remove duplicates and empty extensions.
-void remove_duplicates(std::vector<GaplessExtension>& result) {
+void remove_duplicates(vector<GaplessExtension>& result) {
     auto sort_order = [](const GaplessExtension& a, const GaplessExtension& b) -> bool {
         if (a.read_interval != b.read_interval) {
             return (a.read_interval < b.read_interval);
@@ -363,18 +340,7 @@ void remove_duplicates(std::vector<GaplessExtension>& result) {
         }
         return (a.offset < b.offset);
     };
-    std::sort(result.begin(), result.end(), sort_order);
-
-    // Debug
-    // cout << "remove_duplicates" << endl;
-    // for (size_t i = 0; i < result.size(); i++) {
-    //     cout << result[i].offset << " " << result[i].score << " " << result[i].read_interval.first << " " << result[i].read_interval.second;
-    //     vector<size_t>::iterator mit;
-    //     for (mit = result[i].mismatch_positions.begin(); mit != result[i].mismatch_positions.end(); mit++) {
-    //         cout << " " << *mit;
-    //     }
-    //     cout << endl;
-    // }
+    sort(result.begin(), result.end(), sort_order);
 
     size_t tail = 0;
     for (size_t i = 0; i < result.size(); i++) {
@@ -383,7 +349,7 @@ void remove_duplicates(std::vector<GaplessExtension>& result) {
         }
         if (tail == 0 || result[i] != result[tail - 1]) {
             if (i > tail) {
-                result[tail] = std::move(result[i]);
+                result[tail] = move(result[i]);
             }
             tail++;
         }
@@ -392,14 +358,14 @@ void remove_duplicates(std::vector<GaplessExtension>& result) {
 }
 
 // Realign the extensions to find the mismatching positions.
-void find_mismatches(const std::string& seq, const gbwtgraph::GBWTGraph& graph, std::vector<GaplessExtension>& result) {
+void find_mismatches(const string& seq, const gbwtgraph::GBWTGraph& graph, vector<GaplessExtension>& result) {
     for (GaplessExtension& extension : result) {
         if (extension.internal_score == 0) {
             continue;
         }
         extension.mismatch_positions.reserve(extension.internal_score);
         size_t node_offset = extension.offset, read_offset = extension.read_interval.first;
-        for (const handle_t& handle : extension.path) {
+        for (const gbwtgraph::handle_t& handle : extension.path) {
             gbwtgraph::view_type target = graph.get_sequence_view(handle);
             while (node_offset < target.second && read_offset < extension.read_interval.second) {
                 if (target.first[node_offset] != seq[read_offset]) {
@@ -422,8 +388,6 @@ void set_score(GaplessExtension& extension) {
     // Handle full-length bonuses.
     extension.score += static_cast<int32_t>(extension.left_full * default_full_length_bonus);
     extension.score += static_cast<int32_t>(extension.right_full * default_full_length_bonus);
-    // cout << extension.score << endl;
-    // cout << extension.internal_score << endl;
 }
 
 bool process_next_state(const gbwt::BidirectionalState& next_state, GaplessExtension& curr, string sequence, const gbwtgraph::GBWTGraph* graph, uint32_t mismatch_limit, priority_queue<GaplessExtension>& extensions, size_t& num_extensions, bool& found_extension, HandlePosition direction) {
@@ -434,7 +398,7 @@ bool process_next_state(const gbwt::BidirectionalState& next_state, GaplessExten
         curr.left_maximal, curr.right_maximal, curr.internal_score, curr.old_score
     };
 
-    handle_t handle;
+    gbwtgraph::handle_t handle;
     size_t node_offset = 0;
 
     // Check if we are going right or left
@@ -485,19 +449,18 @@ bool process_next_state(const gbwt::BidirectionalState& next_state, GaplessExten
     }
 
     extensions.push(move(next));
-    // printf("[INSIDE] Score[%d] - Num extensions %lu, Found %d\n", curr.score, num_extensions, found_extension);
     return true;
 }
 
 template<class Element>
-void in_place_subvector(std::vector<Element>& vec, size_t head, size_t tail) {
+void in_place_subvector(vector<Element>& vec, size_t head, size_t tail) {
     if (head >= tail || tail > vec.size()) {
         vec.clear();
         return;
     }
     if (head > 0) {
         for (size_t i = head; i < tail; i++) {
-            vec[i - head] = std::move(vec[i]);
+            vec[i - head] = move(vec[i]);
         }
     }
     vec.resize(tail - head);
@@ -511,14 +474,14 @@ bool trim_mismatches(GaplessExtension& extension, const gbwtgraph::GBWTGraph& gr
 
     // Start with the initial run of matches.
     auto mismatch = extension.mismatch_positions.begin();
-    std::pair<size_t, size_t> current_interval(extension.read_interval.first, *mismatch);
+    pair<size_t, size_t> current_interval(extension.read_interval.first, *mismatch);
     int32_t current_score = (current_interval.second - current_interval.first) * default_match;
     if (extension.left_full) {
         current_score += default_full_length_bonus;
     }
 
     // Process the alignment and keep track of the best interval we have seen so far.
-    std::pair<size_t, size_t> best_interval = current_interval;
+    pair<size_t, size_t> best_interval = current_interval;
     int32_t best_score = current_score;
     while (mismatch != extension.mismatch_positions.end()) {
         // See if we should start a new interval after the mismatch.
@@ -627,7 +590,6 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
         // Check if the seed is contained in an exact full-length alignment.
         if (best_alignment < result.size() && result[best_alignment].internal_score == 0) {
             if (result[best_alignment].contains(*graph, seed, node_offset, read_offset)) {
-                // cout << "Contains on result" << endl;
                 continue;
             }
         }
@@ -635,8 +597,8 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
         GaplessExtension best_match {
             { }, static_cast<size_t>(0), gbwt::BidirectionalState(),
             { static_cast<size_t>(0), static_cast<size_t>(0) }, { },
-            std::numeric_limits<int32_t>::min(), false, false,
-            false, false, std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint32_t>::max()
+            numeric_limits<int32_t>::min(), false, false,
+            false, false, numeric_limits<uint32_t>::max(), numeric_limits<uint32_t>::max()
         };
         
         priority_queue<GaplessExtension> extensions;
@@ -707,7 +669,6 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
             // Case 3: Maximal extension with a better score than the best extension so far.
             if (best_match < curr) {
                 best_match = move(curr);
-                // cout << "Best match " << best_match.score << endl;
             }
         }
 
@@ -765,10 +726,10 @@ void write_extensions(ExtensionResult* results, int size) {
     string fileName = "/soe/jessicadagostini/miniGiraffe/data/proxy_extensions_" + date_time + ".bin";
 
     // Create an output file stream
-    std::ofstream outFile(fileName, std::ios::binary | std::ios::app);
+    ofstream outFile(fileName, ios::binary | ios::app);
 
     if (!outFile) {
-        std::cerr << "Error opening file: " << fileName << std::endl;
+        cerr << "Error opening file: " << fileName << endl;
     }
 
     ExtensionResult r;
@@ -834,7 +795,7 @@ void load_seeds(string filename, vector<Source> &data) {
         }
         // cout << tmpData.sequence << endl;
         file.read(reinterpret_cast<char*>(&qnt), sizeof(qnt));
-        // std::cout << "Qnt " << qnt << endl;
+        // cout << "Qnt " << qnt << endl;
         for(size_t i = 0; i < qnt; i++) {
             file.read(reinterpret_cast<char*>(&tmp), sizeof(seed_type));
             // cout << tmp.second << endl;
@@ -853,7 +814,7 @@ void load_seeds(string filename, vector<Source> &data) {
                 // End of file reached
                 break;
             } else {
-                std::cerr << "Error reading from the file." << std::endl;
+                cerr << "Error reading from the file." << endl;
                 return;
             }
         }
@@ -896,7 +857,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
         }
     }
 
-    // std::printf("Thread %d finished it's local workload!\n", tid);
+    // printf("Thread %d finished it's local workload!\n", tid);
     finished_threads.fetch_add(1);
 
     // Steal tasks from other worklists.
@@ -905,7 +866,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
         if (target == tid) {
             target = (target + 1) % num_threads;
         }
-        // std::printf("Thread %d helping thread %d\n", tid, target);
+        // printf("Thread %d helping thread %d\n", tid, target);
         int r;
         while ((r = Q[target].deq_batch(batch, batchsize)) != -1) {
             for(int j=0; j<batchsize; j++) {
@@ -924,7 +885,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
 int main(int argc, char *argv[]) {
     vector<Source> data;
     int batch_size = DEFAULT_PARALLEL_BATCHSIZE;
-    GBZ gbz;
+    gbwtgraph::GBZ gbz;
     
     string filename_dump = argv[1];
     string filename_gbz = argv[2];
@@ -938,7 +899,7 @@ int main(int argc, char *argv[]) {
     
     cout << "Reading GBZ" << endl;
     sdsl::simple_sds::load_from(gbz, filename_gbz);
-    const GBWTGraph* graph = &gbz.graph;
+    const gbwtgraph::GBWTGraph* graph = &gbz.graph;
 
     int size = data.size();
     ExtensionResult* full_result = new ExtensionResult[size];

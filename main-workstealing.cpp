@@ -167,29 +167,41 @@ static size_t get_read_offset(seed_type seed) {
     return (seed.second < 0 ? 0 : seed.second);
 }
 
-vector<handle_t> get_path(const vector<handle_t>& first, handle_t second) {
+enum class HandlePosition {
+    Forward,
+    Backward
+};
+
+vector<handle_t> get_path(const vector<handle_t>& vec, handle_t handle, HandlePosition pos) {
     vector<handle_t> result;
-    result.reserve(first.size() + 1);
-    result.insert(result.end(), first.begin(), first.end());
-    result.push_back(second);
+    result.reserve(vec.size() + 1);
+
+    if (pos == HandlePosition::Backward) {
+        result.push_back(handle);
+        result.insert(result.end(), vec.begin(), vec.end());
+    } else {
+        result.insert(result.end(), vec.begin(), vec.end());
+        result.push_back(handle);
+    }
+
     return result;
 }
 
-vector<handle_t> get_path(handle_t first, const vector<handle_t>& second) {
-    vector<handle_t> result;
-    result.reserve(second.size() + 1);
-    result.push_back(first);
-    result.insert(result.end(), second.begin(), second.end());
-    return result;
-}
+// vector<handle_t> get_path(const vector<handle_t>& first, handle_t second) {
+//     vector<handle_t> result;
+//     result.reserve(first.size() + 1);
+//     result.insert(result.end(), first.begin(), first.end());
+//     result.push_back(second);
+//     return result;
+// }
 
-vector<handle_t> get_path(const vector<handle_t>& first, gbwt::node_type second) {
-    return get_path(first, gbwtgraph::GBWTGraph::node_to_handle(second));
-}
-
-vector<handle_t> get_path(gbwt::node_type reverse_first, const vector<handle_t>& second) {
-    return get_path(gbwtgraph::GBWTGraph::node_to_handle(gbwt::Node::reverse(reverse_first)), second);
-}
+// vector<handle_t> get_path(handle_t first, const vector<handle_t>& second) {
+//     vector<handle_t> result;
+//     result.reserve(second.size() + 1);
+//     result.push_back(first);
+//     result.insert(result.end(), second.begin(), second.end());
+//     return result;
+// }
 
 void match_initial(GaplessExtension& match, const std::string& seq, gbwtgraph::view_type target) {
     size_t node_offset = match.offset;
@@ -414,6 +426,69 @@ void set_score(GaplessExtension& extension) {
     // cout << extension.internal_score << endl;
 }
 
+bool process_next_state(const gbwt::BidirectionalState& next_state, GaplessExtension& curr, string sequence, const gbwtgraph::GBWTGraph* graph, uint32_t mismatch_limit, priority_queue<GaplessExtension>& extensions, size_t& num_extensions, bool& found_extension, HandlePosition direction) {
+    GaplessExtension next {
+        { }, curr.offset, next_state,
+        curr.read_interval, { },
+        curr.score, curr.left_full, curr.right_full,
+        curr.left_maximal, curr.right_maximal, curr.internal_score, curr.old_score
+    };
+
+    handle_t handle;
+    size_t node_offset = 0;
+
+    // Check if we are going right or left
+    if (direction == HandlePosition::Forward) { // Right
+        handle = gbwtgraph::GBWTGraph::node_to_handle(next_state.forward.node);
+
+        node_offset = match_forward(next, sequence, graph->get_sequence_view(handle), mismatch_limit);
+
+        if (node_offset == 0) return true;
+
+        // Did the extension become right-maximal?
+        if (next.read_interval.second >= sequence.length()) {
+            next.right_full = true;
+            next.right_maximal = true;
+            next.old_score = next.internal_score;
+        } else if (node_offset < graph->get_length(handle)) {
+            next.right_maximal = true;
+            next.old_score = next.internal_score;
+        }
+    } else { // Left
+        // printf("Entrou left\n");
+        handle = gbwtgraph::GBWTGraph::node_to_handle(gbwt::Node::reverse(next_state.backward.node));
+
+        // If we are going to left, need to change next.offse
+        next.offset = graph->get_length(handle);
+
+        match_backward(next, sequence, graph->get_sequence_view(handle), mismatch_limit);
+
+        if(next.offset >= graph->get_length(handle)) return true;
+
+         // Did the extension become left-maximal?
+        if (next.read_interval.first == 0) {
+            next.left_full = true;
+            next.left_maximal = true;
+            // No need to set old_score.
+        } else if (next.offset > 0) {
+            next.left_maximal = true;
+        }
+    }
+
+    next.path = get_path(curr.path, handle, direction);
+
+    set_score(next);
+    if (direction == HandlePosition::Forward) {
+        num_extensions += next.state.size();
+    } else {
+        found_extension = true;
+    }
+
+    extensions.push(move(next));
+    // printf("[INSIDE] Score[%d] - Num extensions %lu, Found %d\n", curr.score, num_extensions, found_extension);
+    return true;
+}
+
 template<class Element>
 void in_place_subvector(std::vector<Element>& vec, size_t head, size_t tail) {
     if (head >= tail || tail > vec.size()) {
@@ -543,7 +618,7 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
     vector<GaplessExtension> result;
     result.reserve(seeds.size());
 
-    size_t best_alignment = std::numeric_limits<size_t>::max(); // Metric to find the best extension from each seed        
+    size_t best_alignment = numeric_limits<size_t>::max(); // Metric to find the best extension from each seed        
     for (seed_type seed : seeds) {
         
         size_t node_offset = get_node_offset(seed);
@@ -589,44 +664,21 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
             GaplessExtension curr = move(extensions.top());
             extensions.pop();
 
+            // Always allow at least max_mismatches / 2 mismatches in the current flank.
+            uint32_t mismatch_limit = max(
+                static_cast<uint32_t>(MAX_MISMATCHES + 1),
+                static_cast<uint32_t>(MAX_MISMATCHES / 2 + curr.old_score + 1));
+
+            size_t num_extensions = 0;
+            bool found_extension = false;
+
             // Case 1: Extend to the right.
             if (!curr.right_maximal) {
-                size_t num_extensions = 0;
-                // Always allow at least max_mismatches / 2 mismatches in the current flank.
-                uint32_t mismatch_limit = max(
-                    static_cast<uint32_t>(MAX_MISMATCHES + 1),
-                    static_cast<uint32_t>(MAX_MISMATCHES / 2 + curr.old_score + 1));
                 
-                // graph->follow_paths(state, bool, bool or lamda?);
                 graph->follow_paths(curr.state, false, [&](const gbwt::BidirectionalState& next_state) -> bool {
-                    handle_t handle = gbwtgraph::GBWTGraph::node_to_handle(next_state.forward.node);
-
-                    GaplessExtension next {
-                        { }, curr.offset, next_state,
-                        curr.read_interval, { },
-                        curr.score, curr.left_full, curr.right_full,
-                        curr.left_maximal, curr.right_maximal, curr.internal_score, curr.old_score
-                    };
-
-                    size_t node_offset = match_forward(next, sequence, graph->get_sequence_view(handle), mismatch_limit);
-                    if (node_offset == 0) { // Did not match anything.
-                        return true;
-                    }
-                    next.path = get_path(curr.path, handle);
-                    // Did the extension become right-maximal?
-                    if (next.read_interval.second >= sequence.length()) {
-                        next.right_full = true;
-                        next.right_maximal = true;
-                        next.old_score = next.internal_score;
-                    } else if (node_offset < graph->get_length(handle)) {
-                                next.right_maximal = true;
-                        next.old_score = next.internal_score;
-                    }
-                    set_score(next);
-                    num_extensions += next.state.size();
-                    extensions.push(move(next));
-                    return true;
+                    return process_next_state(next_state, curr, sequence, graph, mismatch_limit, extensions, num_extensions, found_extension, HandlePosition::Forward);
                 });
+                
                 // We could not extend all threads in 'curr' to the right. The unextended ones
                 // may have different left extensions, so we must consider 'curr' right-maximal.
                 if (num_extensions < curr.state.size()) {
@@ -639,39 +691,11 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
 
             // Case 2: Extend to the left.
             if (!curr.left_maximal) {
-                bool found_extension = false;
-                // Always allow at least max_mismatches / 2 mismatches in the current flank.
-                uint32_t mismatch_limit = max(
-                    static_cast<uint32_t>(MAX_MISMATCHES + 1),
-                    static_cast<uint32_t>(MAX_MISMATCHES / 2 + curr.old_score + 1));
+
                 graph->follow_paths(curr.state, true, [&](const gbwt::BidirectionalState& next_state) -> bool {
-                    handle_t handle = gbwtgraph::GBWTGraph::node_to_handle(gbwt::Node::reverse(next_state.backward.node));
-                    size_t node_length = graph->get_length(handle);
-                    GaplessExtension next {
-                        { }, node_length, next_state,
-                        curr.read_interval, { },
-                        curr.score, curr.left_full, curr.right_full,
-                        curr.left_maximal, curr.right_maximal, curr.internal_score, curr.old_score
-                    };
-                    match_backward(next, sequence, graph->get_sequence_view(handle), mismatch_limit);
-                    if (next.offset >= node_length) { // Did not match anything.
-                        return true;
-                    }
-                    next.path = get_path(handle, curr.path);
-                    // Did the extension become left-maximal?
-                    if (next.read_interval.first == 0) {
-                        next.left_full = true;
-                        next.left_maximal = true;
-                        // No need to set old_score.
-                    } else if (next.offset > 0) {
-                        next.left_maximal = true;
-                        // No need to set old_score.
-                    }
-                    set_score(next);
-                    extensions.push(move(next));
-                    found_extension = true;
-                    return true;
+                    return process_next_state(next_state, curr, sequence, graph, mismatch_limit, extensions, num_extensions, found_extension, HandlePosition::Backward);
                 });
+
                 if (!found_extension) {
                     curr.left_maximal = true;
                     // No need to set old_score.
@@ -727,11 +751,6 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
     
     full_result[element_index].sequence = sequence;
     full_result[element_index].extensions = result;
-    // cout << "Saving " << full_result[element_index].sequence << " on full result\n";
-
-    // for (int i = 0; i < result.size(); i++) {
-    //     full_result[element_index].extensions[i] = result[i];
-    // }
 }
 
 void write_extensions(ExtensionResult* results, int size) {
@@ -809,8 +828,6 @@ void load_seeds(string filename, vector<Source> &data) {
     char ch;
     int q = 0;
 
-    cout << "Reading seeds" << endl;
-
     while (!file.eof()) {
         while (file.get(ch) && ch != '\0') {
             tmpData.sequence += ch;
@@ -858,9 +875,9 @@ double get_wall_time() {
     return time.tv_sec + time.tv_nsec / 1000000000.0;
 }
 
-void parallel_enq(int chunk_size, int size, int tid, int num_threads) {
+void dist_workload(int chunk_size, int size, int tid, int num_threads) {
   int start = chunk_size * tid;
-  int end = std::min(start + chunk_size, size); // Make sure we don't index out of array.
+  int end = min(start + chunk_size, size); // Make sure we don't index out of array.
   for (int i = start; i < end; i++) {
     Q[tid].enq(i); // Enqueue index as work item for local worklist.
   }
@@ -916,31 +933,26 @@ int main(int argc, char *argv[]) {
         batch_size = atoi(argv[4]);
     }
 
+    cout << "Reading seeds" << endl;
     load_seeds(filename_dump, data);
     
     cout << "Reading GBZ" << endl;
-    
     sdsl::simple_sds::load_from(gbz, filename_gbz);
     const GBWTGraph* graph = &gbz.graph;
 
     int size = data.size();
-
-    ExtensionResult* full_result = (ExtensionResult*)malloc(size * sizeof(ExtensionResult));
-    if (full_result == NULL) {
-        printf("Memory allocation failed!\n");
-        return 1;
-    }
+    ExtensionResult* full_result = new ExtensionResult[size];
 
     cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << endl;
     
-    thread* thread_array = new std::thread[num_threads];
+    thread* thread_array = new thread[num_threads];
     int chunk_size = (size + (num_threads - 1)) / num_threads;
     for (int i = 0; i < num_threads; i++) {
         // Initialize local worklists.
         Q[i].init(chunk_size);
 
         // Launch threads to enqueue to local worklists.
-        thread_array[i] = std::thread(parallel_enq, chunk_size, size, i, num_threads);
+        thread_array[i] = thread(dist_workload, chunk_size, size, i, num_threads);
     }
 
     // Join.
@@ -950,7 +962,7 @@ int main(int argc, char *argv[]) {
 
     // Spawn threads to carry out work.
     for (int i = 0; i < num_threads; i++) {
-        thread_array[i] = std::thread(work_stealing, std::ref(data), graph, full_result, batch_size, i, num_threads);
+        thread_array[i] = thread(work_stealing, ref(data), graph, full_result, batch_size, i, num_threads);
     }
 
     // Join.
@@ -964,8 +976,8 @@ int main(int argc, char *argv[]) {
     // }
     cout << "Finished mapping" << endl;
     cout << "Writing extensions" << endl;
-    time_utils_dump();
-    // write_extensions(full_result, size);
+    // time_utils_dump();
+    write_extensions(full_result, size);
 
     return 0;
 }

@@ -85,9 +85,6 @@ struct GaplessExtension {
     size_t length() const { return this->read_interval.second - this->read_interval.first; }
 
     bool empty() const { return (this->length() == 0); }
-
-    /// Is the extension an exact match?
-    bool exact() const { return this->mismatch_positions.empty(); }
     
     bool operator<(const GaplessExtension& another) const {
         return (this->score < another.score);
@@ -440,7 +437,7 @@ void in_place_subvector(vector<Element>& vec, size_t head, size_t tail) {
 
 bool trim_mismatches(GaplessExtension& extension, const gbwtgraph::GBWTGraph& graph) {
 
-    if (extension.exact()) {
+    if (extension.mismatch_positions.empty()) {
         return false;
     }
 

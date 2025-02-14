@@ -38,7 +38,7 @@ main: main.cpp time-utils.so
 openmp: main-openmp.cpp time-utils.so perf-utils.so
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
 
-workstealing-32: main-workstealing.cpp time-utils.so perf-utils.so
+miniGiraffe: miniGiraffe.cpp time-utils.so perf-utils.so
 	$(CXX) -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
 
 main-new: main-new.cpp

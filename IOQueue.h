@@ -61,6 +61,6 @@ class IOQueue {
 
  private:
   int *buffer;
-  std::atomic<int> front; // Dequeue at front.
-  std::atomic<int> end;   // Enqueue at end.
+  std::atomic<int> front;
+  std::atomic<int> end;
 };

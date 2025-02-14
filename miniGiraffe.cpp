@@ -873,37 +873,47 @@ int main(int argc, char *argv[]) {
     int size = data.size();
     ExtensionResult* full_result = new ExtensionResult[size];
 
-    cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << endl;
-    
-    thread* thread_array = new thread[num_threads];
-    int chunk_size = (size + (num_threads - 1)) / num_threads;
-    for (int i = 0; i < num_threads; i++) {
-        // Initialize local worklists.
-        Q[i].init(chunk_size);
+    char scheduler = 'o';
 
-        // Launch threads to enqueue to local worklists.
-        thread_array[i] = thread(dist_workload, chunk_size, size, i, num_threads);
+    cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler." << endl;
+    if (scheduler == 'w') {
+        // Work-stealing scheduler
+        thread* thread_array = new thread[num_threads];
+        int chunk_size = (size + (num_threads - 1)) / num_threads;
+        for (int i = 0; i < num_threads; i++) {
+            // Initialize local worklists.
+            Q[i].init(chunk_size);
+
+            // Launch threads to enqueue to local worklists.
+            thread_array[i] = thread(dist_workload, chunk_size, size, i, num_threads);
+        }
+
+        // Join.
+        for (int i = 0; i < num_threads; i++) {
+            thread_array[i].join();
+        }
+
+        // Spawn threads to carry out work.
+        for (int i = 0; i < num_threads; i++) {
+            thread_array[i] = thread(work_stealing, ref(data), graph, full_result, batch_size, i, num_threads);
+        }
+
+        // Join.
+        for (int i = 0; i < num_threads; i++) {
+            thread_array[i].join();
+        }
+    } else {
+        // OpenMP Scheduler
+        omp_set_num_threads(num_threads);
+        #pragma omp parallel for shared(graph, full_result) schedule(dynamic, batch_size)
+        for (int i = 0; i < size; i++) {
+            double start = get_wall_time();
+            extend(data[i].sequence, data[i].seeds, graph, i, full_result);
+            double end = get_wall_time();
+            time_utils_add(start, end, 5, omp_get_thread_num());
+        }        
     }
 
-    // Join.
-    for (int i = 0; i < num_threads; i++) {
-        thread_array[i].join();
-    }
-
-    // Spawn threads to carry out work.
-    for (int i = 0; i < num_threads; i++) {
-        thread_array[i] = thread(work_stealing, ref(data), graph, full_result, batch_size, i, num_threads);
-    }
-
-    // Join.
-    for (int i = 0; i < num_threads; i++) {
-        thread_array[i].join();
-    }
-
-
-    // for (auto d : data) {
-    //     extend(d.sequence, d.seeds, graph, full_result);
-    // }
     cout << "Finished mapping" << endl;
     cout << "Writing extensions" << endl;
     // time_utils_dump();

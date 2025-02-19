@@ -5,6 +5,7 @@
 #include <queue>
 #include <omp.h>
 #include <cstdlib>
+#include <unistd.h>
 
 #include "time-utils.h"
 
@@ -50,6 +51,8 @@ constexpr static double OVERLAP_THRESHOLD = 0.8;
 constexpr static size_t MAX_MISMATCHES = 4;
 const uint64_t DEFAULT_PARALLEL_BATCHSIZE = 512;
 const uint32_t INFINITY_MISMATCHES = 1000000;
+bool profile = false;
+
 
 IOQueue Q[50];
 atomic_int finished_threads(0);
@@ -743,13 +746,13 @@ void write_extensions(ExtensionResult* results, int size) {
     outFile.close();
 }
 
-void load_seeds(string filename, vector<Source> &data) {
+int load_seeds(string filename, vector<Source> &data) {
     // Open the file in binary mode for reading
     ifstream file(filename, ios::binary);
 
     if (!file.is_open()) {
         cerr << "Error opening the file!" << endl;
-        return;
+        return -1;
     }
     
     Source tmpData;
@@ -784,7 +787,7 @@ void load_seeds(string filename, vector<Source> &data) {
                 break;
             } else {
                 cerr << "Error reading from the file." << endl;
-                return;
+                return -1;
             }
         }
         
@@ -797,6 +800,7 @@ void load_seeds(string filename, vector<Source> &data) {
 
     // Close the file
     file.close();
+    return 0;
 }
 
 double get_wall_time() {
@@ -814,15 +818,17 @@ void dist_workload(int chunk_size, int size, int tid, int num_threads) {
 }
 
 void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, ExtensionResult* full_result, int batchsize, int tid, int num_threads) {
-    // int batch[batchsize];
+    double start, end;
     int* batch = (int*)malloc(batchsize * sizeof(int));
     for (int r = Q[tid].deq_batch(batch, batchsize); r != -1; r = Q[tid].deq_batch(batch, batchsize)) {
         for (int j=0; j<batchsize; j++) {
             int i = batch[j];
-            double start = get_wall_time();
+            if (profile) start = get_wall_time();
             extend(data[i].sequence, data[i].seeds, graph, i, full_result);
-            double end = get_wall_time();
-            time_utils_add(start, end, 5, tid);
+            if (profile) {
+                double end = get_wall_time();
+                time_utils_add(start, end, 5, tid);
+            }
         }
     }
 
@@ -840,10 +846,12 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
         while ((r = Q[target].deq_batch(batch, batchsize)) != -1) {
             for(int j=0; j<batchsize; j++) {
                 int i = batch[j];
-                double start = get_wall_time();
+                if (profile) start = get_wall_time();
                 extend(data[i].sequence, data[i].seeds, graph, i, full_result);
-                double end = get_wall_time();
-                time_utils_add(start, end, 5, tid);
+                if (profile) {
+                    double end = get_wall_time();
+                    time_utils_add(start, end, 5, tid);
+                }
             }
         }
 
@@ -851,32 +859,91 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
     }
 }
 
+void usage() {
+    cout << "Usage miniGiraffe [seed_file] [gbz_file] [options]" << endl;
+    cout << "Options: " << endl;
+    cout << "   -t, number of threads (default: max # threads in system)" << endl;
+    cout << "   -b, batch size (default: 512)" << endl;
+    cout << "   -s, scheduler [omp, ws] (default: omp)" << endl;
+    cout << "   -p, enable profiling (default: disabled)" << endl;
+}
+
 int main(int argc, char *argv[]) {
     vector<Source> data;
-    int batch_size = DEFAULT_PARALLEL_BATCHSIZE;
     gbwtgraph::GBZ gbz;
+    int num_threads;
+    int batch_size = DEFAULT_PARALLEL_BATCHSIZE;
+    string scheduler = "omp";
+    const gbwtgraph::GBWTGraph* graph;
+    int opt;
     
+    if(argc < 4) { usage(); return 0;}
+
     string filename_dump = argv[1];
     string filename_gbz = argv[2];
-    int num_threads = atoi(argv[3]);
-    if (argv[4]!=NULL) {
-        batch_size = atoi(argv[4]);
+    
+
+    while ((opt = getopt(argc, argv, "hpt:s:b:")) != -1) {
+        switch (opt) {
+            case 'h':
+                usage();
+                return 0;
+            case 'p':
+                profile = true;
+                break;
+            case 't':
+                try {
+                    num_threads = stoi(optarg);
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Error: Option -t requires an integer value.\n";
+                    return 1;
+                }
+                break;
+            case 's':
+                try {
+                    scheduler = optarg;
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Error: Option -t requires an integer value.\n";
+                    return 1;
+                }
+                break;
+            case 'b':
+                try {
+                    batch_size = atoi(optarg);
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Error: Option -b requires an integer value.\n";
+                    return 1;
+                }
+                break;
+            case '?': // getopt detects unknown options and sets opt to '?'
+                std::cerr << "Unknown option: -" << (char)optopt << std::endl; // optopt has the unknown option char
+                // fallthrough
+                usage();
+                break;
+            default: // For '?' and potentially other errors
+                usage();
+                return 1;
+        }
     }
 
-    cout << "Reading seeds" << endl;
-    load_seeds(filename_dump, data);
+    cout << "Reading seeds " << filename_dump << endl;
+    if (load_seeds(filename_dump, data) == -1) { usage(); return -1;}
     
     cout << "Reading GBZ" << endl;
-    sdsl::simple_sds::load_from(gbz, filename_gbz);
-    const gbwtgraph::GBWTGraph* graph = &gbz.graph;
+    try {
+        sdsl::simple_sds::load_from(gbz, filename_gbz);
+        graph = &gbz.graph;
+    } catch(const std::exception& e) {
+        cerr << "Error reading GBZ file" << endl;
+        usage();
+        return -1;
+    }
 
     int size = data.size();
     ExtensionResult* full_result = new ExtensionResult[size];
 
-    char scheduler = 'o';
-
     cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler." << endl;
-    if (scheduler == 'w') {
+    if (scheduler == "ws") {
         // Work-stealing scheduler
         thread* thread_array = new thread[num_threads];
         int chunk_size = (size + (num_threads - 1)) / num_threads;
@@ -905,18 +972,21 @@ int main(int argc, char *argv[]) {
     } else {
         // OpenMP Scheduler
         omp_set_num_threads(num_threads);
+        double start, end;
         #pragma omp parallel for shared(graph, full_result) schedule(dynamic, batch_size)
         for (int i = 0; i < size; i++) {
-            double start = get_wall_time();
+            if (profile) start = get_wall_time();
             extend(data[i].sequence, data[i].seeds, graph, i, full_result);
-            double end = get_wall_time();
-            time_utils_add(start, end, 5, omp_get_thread_num());
+            if (profile) {
+                double end = get_wall_time();
+                time_utils_add(start, end, 5, omp_get_thread_num());
+            }
         }        
     }
 
     cout << "Finished mapping" << endl;
     cout << "Writing extensions" << endl;
-    // time_utils_dump();
+    if (profile) time_utils_dump();
     write_extensions(full_result, size);
 
     return 0;

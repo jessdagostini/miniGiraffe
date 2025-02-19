@@ -25,12 +25,17 @@ Running miniGiraffe
 Having the input files, you can execute miniGiraffe using
 
 ```
-./miniGiraffe /path/to/seeds/dump.bin /path/to/gbz/file.gbz <scheduler option> <# of threads> <# of blocks>
+Usage ./miniGiraffe [/path/to/seeds/dump.bin] [/path/to/gbz/file.gbz] [options]
+Options: 
+   -t, number of threads (default: max # threads in system)
+   -b, batch size (default: 512)
+   -s, scheduler [omp, ws] (default: omp)
+   -p, enable profiling (default: disabled)
 ```
 
 There are two possible ways to run miniGiraffe in parallel. First is using OpenMP dynamic scheduler, identified as `omp`. The second is using the work-stealing scheduler identified as `ws`. Default scheduler is `omp`.
 
-miniGiraffe maps batches of sequences spread across multiple threads, processing one sequence at a time in each thread. It will time the execution of each mapped sequence, and will output at the end of the execution over `std` output. miniGiraffe also generates a .bin file with the extensions found over it's execution. This file can be used to comparison and validation of the procedure made by miniGiraffe and Giraffe.
+miniGiraffe maps batches of sequences spread across multiple threads, processing one sequence at a time in each thread. If enabling profiling (`p` option), it will time the execution of each mapped sequence, and will output at the end of the execution over `std` output. miniGiraffe also generates a .bin file with the extensions found over it's execution. This file can be used to comparison and validation of the procedure made by miniGiraffe and Giraffe.
 
 
 Citation

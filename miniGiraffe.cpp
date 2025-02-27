@@ -63,8 +63,6 @@ struct Source {
 };
 
 struct GaplessExtension {
-    // For proxy
-    // string sequence;
      // In the graph.
     vector<gbwtgraph::handle_t>     path;
     size_t                          offset;
@@ -684,7 +682,7 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
     
     full_result[element_index].sequence = sequence;
     full_result[element_index].extensions = result;
-}
+} 
 
 void write_extensions(ExtensionResult* results, int size) {
     // Specify the file name
@@ -871,7 +869,7 @@ void usage() {
 int main(int argc, char *argv[]) {
     vector<Source> data;
     gbwtgraph::GBZ gbz;
-    int num_threads;
+    int num_threads = omp_get_max_threads();
     int batch_size = DEFAULT_PARALLEL_BATCHSIZE;
     string scheduler = "omp";
     const gbwtgraph::GBWTGraph* graph;

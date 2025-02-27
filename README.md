@@ -8,9 +8,12 @@ Clone this repository using the recursive option (to download dependencies from 
 
 ```git clone --recursive git@github.com:jessdagostini/miniGiraffe.git```
 
-Navigate to the folder and run
+After the download, navigate to the folder. We first install the dependencies, and then build miniGiraffe. It's about two command lines to have miniGiraffe ready to run.
 
-`build command`
+```
+bash install-deps.sh
+make miniGiraffe
+```
 
 Input Description
 ------------------------------------------
@@ -18,7 +21,14 @@ To execute, miniGiraffe expects two different inputs
 - The input with pairs of sequences + seeds, generated from VG Giraffe
 - The pangenome graph in GBZ file format
 
-Given the size of the inputs, they are not available directly in this repository. We host few inputs in this link.
+Given the size of the inputs, they are not available directly in this repository.
+We host four input sets in this link.
+
+Users can also generate their own set of inputs using a modified version of VG Giraffe available in this Docker image. To generate new binaries with the pairs of squences + seeds, follow below steps:
+
+```
+Steps to generate input with Docker
+```
 
 Running miniGiraffe
 ------------------------------------------

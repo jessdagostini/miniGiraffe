@@ -555,8 +555,8 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
     size_t best_alignment = numeric_limits<size_t>::max(); // Metric to find the best extension from each seed        
     for (seed_type seed : seeds) {
         
-        size_t node_offset = get_node_offset(seed);
-        size_t read_offset = get_read_offset(seed);
+        size_t node_offset = (seed.second < 0) ? -(seed.second) : 0;
+        size_t read_offset = (seed.second < 0) ? 0 : seed.second;
 
         // Check if the seed is contained in an exact full-length alignment.
         if (best_alignment < result.size() && result[best_alignment].internal_score == 0) {

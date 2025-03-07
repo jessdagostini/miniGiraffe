@@ -6,22 +6,13 @@ long long int entryPointCount = 0;
 
 pthread_rwlock_t lock_time_utils;
 
-// For gbwt_extender
-// char regions[10][40] = {"gapless_extender", "for_each_seed", "if_contains", "construct_best_match", "priority_queue_extensions", "move_extensions", "to_right", "to_left", "best_match_move", "best_match_empty"};
-
-// For minimizer_mapper
-// char regions[10][40] = {"cluster_seeds", "process_until_threshold_c", "score_extensions", "process_until_threshold_b"};
-// char regions[10][40] = {"process_until_threshold_c", "map_paired"};
-// char regions[10][40] = {"omp-loop"};
-
-// For proxy
-char regions[10][40] = {"omp-loop", "reading-seeds", "reading-gbz", "writing-output", "seeds-loop"};
 
 void time_utils_dump() {
     // fprintf(stderr, "Entrou dump\n");
     entryPoint *s = NULL;
     entryPoint *tmp = NULL;
 
+    fprintf(stderr, "\nTime Measurements\n");
     HASH_ITER(hh, timers, s, tmp) {
         fprintf(stderr, "%s, %0.10f, %0.10f, %d\n", regions[s->id_func], s->start, s->end, s->thread);
     }

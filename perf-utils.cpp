@@ -1,42 +1,38 @@
 #include "perf-utils.h"
 
-entryPoint * events = NULL;
+perfEntryPoint * events = NULL;
 
-long long int entryPointCount = 0;
+long long int perfEntryPointCount = 0;
 
-pthread_rwlock_t lock_time_utils;
-
-// For gbwt_extender
-// char names[10][40] = {"cycles", "kcycles", "instructions", "L1-acess", "L1-misses", "LL-access", "LL-misses", "LLC-misses", "branch-misses", "task-clock"};
-char names[10][40] = {"branch-issued", "branch-misses"};
+pthread_rwlock_t lock_perf_utils;
 
 void perf_utils_dump() {
     // fprintf(stderr, "Entrou dump\n");
-    entryPoint *s = NULL;
-    entryPoint *tmp = NULL;
-
+    perfEntryPoint *s = NULL;
+    perfEntryPoint *tmp = NULL;
+    fprintf(stderr, "\nHardware Measurements\n");
     HASH_ITER(hh, events, s, tmp) {
-        fprintf(stderr, "%s, %0.10f, %d\n", names[s->id_func], s->value, s->thread);
+        fprintf(stderr, "%s, %0.10f, %d\n", counters[s->id_func], s->value, s->thread);
     }
 }
 
 void perf_utils_add(double value, int id_func, int thread) {
-    if (pthread_rwlock_wrlock(&lock_time_utils) != 0) {
+    if (pthread_rwlock_wrlock(&lock_perf_utils) != 0) {
         fprintf(stderr, "Can't get mutex\n");
         exit(-1);
     }
 
-    entryPoint *s = (entryPoint *) malloc(sizeof *s);
+    perfEntryPoint *s = (perfEntryPoint *) malloc(sizeof *s);
 
     s->value = value;
     s->thread = thread;
     s->id_func = id_func;
-    s->id = entryPointCount;
+    s->id = perfEntryPointCount;
 
     HASH_ADD_INT(events, id, s);  /* id is the key field */
 
-    entryPointCount++;
+    perfEntryPointCount++;
 
-    pthread_rwlock_unlock(&lock_time_utils);
+    pthread_rwlock_unlock(&lock_perf_utils);
     // pthread_mutex_unlock(&incoming_queue_mutex);
 }

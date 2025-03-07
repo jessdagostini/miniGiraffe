@@ -1,3 +1,5 @@
 # Compiled sources
 *.exe
 *.so
+ispass-paper/
+data/

@@ -7,10 +7,10 @@
 #include <cstdlib>
 #include <unistd.h>
 
+// For performance monitoring
 #include "time-utils.h"
-
-// #include "perf-event.hpp"
-// #include "perf-utils.h"
+#include "perf-event.hpp"
+#include "perf-utils.h"
 
 #include <atomic>
 #include <thread>
@@ -52,7 +52,8 @@ constexpr static size_t MAX_MISMATCHES = 4;
 const uint64_t DEFAULT_PARALLEL_BATCHSIZE = 512;
 const uint32_t INFINITY_MISMATCHES = 1000000;
 bool profile = false;
-
+bool hw_counters = false;
+PerfEvent e;
 
 IOQueue Q[50];
 atomic_int finished_threads(0);
@@ -693,7 +694,7 @@ void write_extensions(ExtensionResult* results, int size) {
     strftime(buffer, 80, "%Y%m%d%H%M", localtime(&now));
     string date_time(buffer);
 
-    string fileName = "/soe/jessicadagostini/miniGiraffe/data/proxy_extensions_" + date_time + ".bin";
+    string fileName = "./proxy_extensions_" + date_time + ".bin";
 
     // Create an output file stream
     ofstream outFile(fileName, ios::binary | ios::app);
@@ -825,7 +826,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
             extend(data[i].sequence, data[i].seeds, graph, i, full_result);
             if (profile) {
                 double end = get_wall_time();
-                time_utils_add(start, end, 5, tid);
+                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, tid);
             }
         }
     }
@@ -848,13 +849,63 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
                 extend(data[i].sequence, data[i].seeds, graph, i, full_result);
                 if (profile) {
                     double end = get_wall_time();
-                    time_utils_add(start, end, 5, tid);
+                    time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, tid);
                 }
             }
         }
 
         target = (target + 1) % num_threads; // Round robin.
     }
+}
+
+int setup_counters(string optarg) {
+    istringstream ss(optarg);
+    string token;
+    while (getline(ss, token, ',')) {
+        if (token == "IPC") {
+            e.registerCounter("instructions", PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
+            e.registerCounter("cycles", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES);
+            e.nameToIndex["instructions"] = PerfUtilsCounters::INSTRUCTIONS;
+            e.nameToIndex["cycles"] = PerfUtilsCounters::CYCLES;
+        
+        } else if (token == "L1CACHE") {
+            e.registerCounter("L1-access", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16));
+            e.registerCounter("L1-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));
+            e.nameToIndex["L1-access"] = PerfUtilsCounters::L1ACCESS;
+            e.nameToIndex["L1-misses"] = PerfUtilsCounters::L1MISSES;
+        
+        } else if (token == "LLCACHE") {
+            e.registerCounter("LLC-access", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16));
+            e.registerCounter("LLC-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));
+            e.nameToIndex["LLC-access"] = PerfUtilsCounters::LLCACCESS;
+            e.nameToIndex["LLC-misses"] = PerfUtilsCounters::LLCMISSES;
+        
+        } else if (token == "BRANCHES") {
+            e.registerCounter("branch-issued", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS);
+            e.registerCounter("branch-misses", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES);      
+            e.nameToIndex["branch-issued"] = PerfUtilsCounters::BRANCHISSUED;
+            e.nameToIndex["branch-misses"] = PerfUtilsCounters::BRANCHMISSES;
+        
+        } else if (token == "DTLB") {
+            e.registerCounter("DTLB-access", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_DTLB|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16));
+            e.registerCounter("DTLB-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_DTLB|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));  
+            e.nameToIndex["DTLB-access"] = PerfUtilsCounters::DTLBACCESS;
+            e.nameToIndex["DTLB-misses"] = PerfUtilsCounters::DTLBMISSES;
+        
+        } else if (token == "iTLB") {
+            e.registerCounter("ITLB-access", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_ITLB|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16));
+            e.registerCounter("ITLB-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_ITLB|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));  
+            e.nameToIndex["ITLB-access"] = PerfUtilsCounters::ITLBACCESS;
+            e.nameToIndex["ITLB-misses"] = PerfUtilsCounters::ITLBMISSES;
+        
+        } else {
+            std::cerr << "Error: Invalid counter option: " << token << std::endl;
+            // You could either exit here or continue processing other options.
+            // I'm choosing to exit for cleaner error handling.
+            return 1;
+        }
+    }
+    return 0;
 }
 
 void usage() {
@@ -864,6 +915,10 @@ void usage() {
     cout << "   -b, batch size (default: 512)" << endl;
     cout << "   -s, scheduler [omp, ws] (default: omp)" << endl;
     cout << "   -p, enable profiling (default: disabled)" << endl;
+    cout << "   -m <list>, comma-separated list of hardware measurement to enable (default: disabled)" << endl;
+    cout << "              Available counters: IPC, L1CACHE, LLCACHE, BRANCHES, DTLB, ITLB" << std::endl;
+    cout << "              Not recommended to enable more than 3 hw measurement per run" << std::endl;
+    cout << "              given hardware counters constraints" << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -874,6 +929,7 @@ int main(int argc, char *argv[]) {
     string scheduler = "omp";
     const gbwtgraph::GBWTGraph* graph;
     int opt;
+    double start, end; // For profiling
     
     if(argc < 4) { usage(); return 0;}
 
@@ -881,7 +937,7 @@ int main(int argc, char *argv[]) {
     string filename_gbz = argv[2];
     
 
-    while ((opt = getopt(argc, argv, "hpt:s:b:")) != -1) {
+    while ((opt = getopt(argc, argv, "hpc:t:s:b:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -889,6 +945,14 @@ int main(int argc, char *argv[]) {
             case 'p':
                 profile = true;
                 break;
+            case 'c': {
+                hw_counters = true;
+                if (setup_counters(optarg) == 1) {
+                    std::cerr << "Error: Invalid counter option.\n";
+                    return 1;
+                }
+                break;
+            }
             case 't':
                 try {
                     num_threads = stoi(optarg);
@@ -925,12 +989,22 @@ int main(int argc, char *argv[]) {
     }
 
     cout << "Reading seeds " << filename_dump << endl;
+    if (profile) start = get_wall_time();
     if (load_seeds(filename_dump, data) == -1) { usage(); return -1;}
+    if (profile) {
+        double end = get_wall_time();
+        time_utils_add(start, end, TimeUtilsRegions::READING_SEEDS, omp_get_thread_num());
+    }
     
     cout << "Reading GBZ" << endl;
     try {
+        if (profile) start = get_wall_time();
         sdsl::simple_sds::load_from(gbz, filename_gbz);
         graph = &gbz.graph;
+        if (profile) {
+            double end = get_wall_time();
+            time_utils_add(start, end, TimeUtilsRegions::READING_GBZ, omp_get_thread_num());
+        }
     } catch(const std::exception& e) {
         cerr << "Error reading GBZ file" << endl;
         usage();
@@ -960,7 +1034,15 @@ int main(int argc, char *argv[]) {
 
         // Spawn threads to carry out work.
         for (int i = 0; i < num_threads; i++) {
+            if (hw_counters) e.startCounters();
             thread_array[i] = thread(work_stealing, ref(data), graph, full_result, batch_size, i, num_threads);
+            if (hw_counters){
+                e.stopCounters();
+                for (unsigned j=0; j<e.names.size(); j++) {
+                    string name = e.names[j];
+                    perf_utils_add(e.events[j].readCounter(), e.nameToIndex[name], omp_get_thread_num());
+                }
+            }
         }
 
         // Join.
@@ -971,21 +1053,36 @@ int main(int argc, char *argv[]) {
         // OpenMP Scheduler
         omp_set_num_threads(num_threads);
         double start, end;
+        if (hw_counters) e.startCounters();
         #pragma omp parallel for shared(graph, full_result) schedule(dynamic, batch_size)
         for (int i = 0; i < size; i++) {
             if (profile) start = get_wall_time();
             extend(data[i].sequence, data[i].seeds, graph, i, full_result);
             if (profile) {
                 double end = get_wall_time();
-                time_utils_add(start, end, 5, omp_get_thread_num());
+                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, omp_get_thread_num());
             }
-        }        
+        }
+        if (hw_counters){
+            e.stopCounters();
+            for (unsigned j=0; j<e.names.size(); j++) {
+                string name = e.names[j];
+                perf_utils_add(e.events[j].readCounter(), e.nameToIndex[name], omp_get_thread_num());
+            }
+        }
     }
 
     cout << "Finished mapping" << endl;
     cout << "Writing extensions" << endl;
-    if (profile) time_utils_dump();
+    if (profile) start = get_wall_time();
     write_extensions(full_result, size);
+    if (profile) {
+        double end = get_wall_time();
+        time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, omp_get_thread_num());
+    }
+
+    if (profile) time_utils_dump();
+    if (hw_counters) perf_utils_dump();
 
     return 0;
 }

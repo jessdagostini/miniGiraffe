@@ -41,6 +41,10 @@ Options:
    -b, batch size (default: 512)
    -s, scheduler [omp, ws] (default: omp)
    -p, enable profiling (default: disabled)
+   -m <list>, comma-separated list of hardware measurement to enable (default: disabled)
+              Available counters: IPC, L1CACHE, LLCACHE, BRANCHES, DTLB, ITLB
+              Not recommended to enable more than 3 hw measurement per run
+              given hardware counters constraints
 ```
 
 There are two possible ways to run miniGiraffe in parallel. First is using OpenMP dynamic scheduler, identified as `omp`. The second is using the work-stealing scheduler identified as `ws`. Default scheduler is `omp`.

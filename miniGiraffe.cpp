@@ -55,7 +55,7 @@ bool profile = false;
 bool hw_counters = false;
 PerfEvent e;
 
-IOQueue Q[50];
+IOQueue Q[150];
 atomic_int finished_threads(0);
 
 struct Source {
@@ -825,7 +825,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
             if (profile) start = get_wall_time();
             extend(data[i].sequence, data[i].seeds, graph, i, full_result);
             if (profile) {
-                double end = get_wall_time();
+                end = get_wall_time();
                 time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, tid);
             }
         }
@@ -848,7 +848,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
                 if (profile) start = get_wall_time();
                 extend(data[i].sequence, data[i].seeds, graph, i, full_result);
                 if (profile) {
-                    double end = get_wall_time();
+                    end = get_wall_time();
                     time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, tid);
                 }
             }
@@ -892,7 +892,7 @@ int setup_counters(string optarg) {
             e.nameToIndex["DTLB-access"] = PerfUtilsCounters::DTLBACCESS;
             e.nameToIndex["DTLB-misses"] = PerfUtilsCounters::DTLBMISSES;
         
-        } else if (token == "iTLB") {
+        } else if (token == "ITLB") {
             e.registerCounter("ITLB-access", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_ITLB|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16));
             e.registerCounter("ITLB-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_ITLB|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));  
             e.nameToIndex["ITLB-access"] = PerfUtilsCounters::ITLBACCESS;
@@ -909,16 +909,16 @@ int setup_counters(string optarg) {
 }
 
 void usage() {
-    cout << "Usage miniGiraffe [seed_file] [gbz_file] [options]" << endl;
-    cout << "Options: " << endl;
-    cout << "   -t, number of threads (default: max # threads in system)" << endl;
-    cout << "   -b, batch size (default: 512)" << endl;
-    cout << "   -s, scheduler [omp, ws] (default: omp)" << endl;
-    cout << "   -p, enable profiling (default: disabled)" << endl;
-    cout << "   -m <list>, comma-separated list of hardware measurement to enable (default: disabled)" << endl;
-    cout << "              Available counters: IPC, L1CACHE, LLCACHE, BRANCHES, DTLB, ITLB" << std::endl;
-    cout << "              Not recommended to enable more than 3 hw measurement per run" << std::endl;
-    cout << "              given hardware counters constraints" << std::endl;
+    cerr << "Usage miniGiraffe [seed_file] [gbz_file] [options]" << endl;
+    cerr << "Options: " << endl;
+    cerr << "   -t, number of threads (default: max # threads in system)" << endl;
+    cerr << "   -b, batch size (default: 512)" << endl;
+    cerr << "   -s, scheduler [omp, ws] (default: omp)" << endl;
+    cerr << "   -p, enable profiling (default: disabled)" << endl;
+    cerr << "   -m <list>, comma-separated list of hardware measurement to enable (default: disabled)" << endl;
+    cerr << "              Available counters: IPC, L1CACHE, LLCACHE, BRANCHES, DTLB, ITLB" << std::endl;
+    cerr << "              Not recommended to enable more than 3 hw measurement per run" << std::endl;
+    cerr << "              given hardware counters constraints" << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -931,13 +931,13 @@ int main(int argc, char *argv[]) {
     int opt;
     double start, end; // For profiling
     
-    if(argc < 4) { usage(); return 0;}
+    if(argc < 3) { usage(); return 0;}
 
     string filename_dump = argv[1];
     string filename_gbz = argv[2];
     
 
-    while ((opt = getopt(argc, argv, "hpc:t:s:b:")) != -1) {
+    while ((opt = getopt(argc, argv, "hpm:t:s:b:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -945,7 +945,7 @@ int main(int argc, char *argv[]) {
             case 'p':
                 profile = true;
                 break;
-            case 'c': {
+            case 'm': {
                 hw_counters = true;
                 if (setup_counters(optarg) == 1) {
                     std::cerr << "Error: Invalid counter option.\n";
@@ -1015,41 +1015,8 @@ int main(int argc, char *argv[]) {
     ExtensionResult* full_result = new ExtensionResult[size];
 
     cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler." << endl;
-    if (scheduler == "ws") {
-        // Work-stealing scheduler
-        thread* thread_array = new thread[num_threads];
-        int chunk_size = (size + (num_threads - 1)) / num_threads;
-        for (int i = 0; i < num_threads; i++) {
-            // Initialize local worklists.
-            Q[i].init(chunk_size);
-
-            // Launch threads to enqueue to local worklists.
-            thread_array[i] = thread(dist_workload, chunk_size, size, i, num_threads);
-        }
-
-        // Join.
-        for (int i = 0; i < num_threads; i++) {
-            thread_array[i].join();
-        }
-
-        // Spawn threads to carry out work.
-        for (int i = 0; i < num_threads; i++) {
-            if (hw_counters) e.startCounters();
-            thread_array[i] = thread(work_stealing, ref(data), graph, full_result, batch_size, i, num_threads);
-            if (hw_counters){
-                e.stopCounters();
-                for (unsigned j=0; j<e.names.size(); j++) {
-                    string name = e.names[j];
-                    perf_utils_add(e.events[j].readCounter(), e.nameToIndex[name], omp_get_thread_num());
-                }
-            }
-        }
-
-        // Join.
-        for (int i = 0; i < num_threads; i++) {
-            thread_array[i].join();
-        }
-    } else {
+    cout << scheduler << endl;
+    if (scheduler == "omp") {
         // OpenMP Scheduler
         omp_set_num_threads(num_threads);
         double start, end;
@@ -1069,6 +1036,41 @@ int main(int argc, char *argv[]) {
                 string name = e.names[j];
                 perf_utils_add(e.events[j].readCounter(), e.nameToIndex[name], omp_get_thread_num());
             }
+        }
+    } else {
+        // Work-stealing scheduler
+        thread* thread_array = new thread[num_threads];
+        int chunk_size = (size + (num_threads - 1)) / num_threads;
+        for (int i = 0; i < num_threads; i++) {
+            // Initialize local worklists.
+            Q[i].init(chunk_size);
+
+            // Launch threads to enqueue to local worklists.
+            thread_array[i] = thread(dist_workload, chunk_size, size, i, num_threads);
+        }
+
+        // Join.
+        for (int i = 0; i < num_threads; i++) {
+            thread_array[i].join();
+        }
+
+        cout << "Running" << endl;
+        // Spawn threads to carry out work.
+        for (int i = 0; i < num_threads; i++) {
+            if (hw_counters) e.startCounters();
+            thread_array[i] = thread(work_stealing, ref(data), graph, full_result, batch_size, i, num_threads);
+            if (hw_counters){
+                e.stopCounters();
+                for (unsigned j=0; j<e.names.size(); j++) {
+                    string name = e.names[j];
+                    perf_utils_add(e.events[j].readCounter(), e.nameToIndex[name], omp_get_thread_num());
+                }
+            }
+        }
+
+        // Join.
+        for (int i = 0; i < num_threads; i++) {
+            thread_array[i].join();
         }
     }
 

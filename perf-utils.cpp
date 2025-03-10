@@ -10,7 +10,7 @@ void perf_utils_dump() {
     // fprintf(stderr, "Entrou dump\n");
     perfEntryPoint *s = NULL;
     perfEntryPoint *tmp = NULL;
-    fprintf(stderr, "\nHardware Measurements\n");
+    // fprintf(stderr, "\nHardware Measurements\n");
     HASH_ITER(hh, events, s, tmp) {
         fprintf(stderr, "%s, %0.10f, %d\n", counters[s->id_func], s->value, s->thread);
     }

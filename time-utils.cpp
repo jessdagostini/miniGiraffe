@@ -12,7 +12,7 @@ void time_utils_dump() {
     entryPoint *s = NULL;
     entryPoint *tmp = NULL;
 
-    fprintf(stderr, "\nTime Measurements\n");
+    // fprintf(stderr, "\nTime Measurements\n");
     HASH_ITER(hh, timers, s, tmp) {
         fprintf(stderr, "%s, %0.10f, %0.10f, %d\n", regions[s->id_func], s->start, s->end, s->thread);
     }

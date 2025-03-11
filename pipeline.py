@@ -111,7 +111,7 @@ def copy_files(source_path, destination_folder):
         logger.error(f"[Copy Files] An unexpected error occurred: {e}")
 
 
-def run_binary(binary_path, args=None):
+def run_binary(binary_path, args=None, env=''):
     try:
         if args is None:
             args = []
@@ -121,7 +121,7 @@ def run_binary(binary_path, args=None):
         command = " ".join(shlex.quote(arg) for arg in command_list) #Builds safe string
         logger.info(f"[Run Binary] {command}")
         with open(tmp_stdout, "w") as fstdout, open(tmp_stderr, "w") as fstderr:
-            result = subprocess.run(command, stdout=fstdout, stderr=fstderr, text=True, check=True, shell=True)
+            result = subprocess.run(command, stdout=fstdout, stderr=fstderr, text=True, check=True, shell=True, env=env)
         
         return result
 
@@ -184,15 +184,9 @@ for file in mG_files:
     copy_files(source_path, destination_folder)
 
 # Setup the environment with paths
-try:
-    os.environ["LD_LIBRARY_PATH"] = f"$LD_LIBRARY_PATH:{source_folder}/deps/gbwt/lib:{source_folder}/deps/libhandlegraph/lib/usr/local/lib:{source_folder}/:{source_folder}"
-    logger.info(os.environ.get('[Main] LD_LIBRARY_PATH'))
-
-except subprocess.CalledProcessError as e:
-    logger.error(f"[Main] Error running source: {e}")
-    logger.error(f"[Main] Return code: {e.returncode}")
-    logger.error(f"[Main] Stdout: {e.stdout}")
-    logger.error(f"[Main] Stderr: {e.stderr}")
+env_path = os.environ.copy()
+env_path['LD_LIBRARY_PATH'] = f"$LD_LIBRARY_PATH:{source_folder}/deps/gbwt/lib:{source_folder}/deps/libhandlegraph/build/usr/local/lib:{source_folder}/:{source_folder}"
+# logger.info('[Main] LD_LIBRARY_PATH')
 
 # Setup paths
 binary_path = os.path.join(destination_folder, "miniGiraffe")
@@ -201,7 +195,7 @@ gbz_path = os.path.join(destination_folder, "1000GPlons_hs38d1_filter.giraffe.gb
 
 # Run warmup test case
 logger.info("[Main] Running warmup test case")
-if run_binary(binary_path, [seed_path, gbz_path]):
+if run_binary(binary_path, [seed_path, gbz_path], env_path):
     logger.info("[Main] Warmup test case ran successfully")
 else:
     logger.error("[Main] Error running warmup test case")
@@ -280,16 +274,16 @@ for batch in batch_size:
                         logger.info(f"[Main] Test already run: {output_csv}")
                         continue
                     
-                    output = run_binary(binary_path, [seed_path, gbz_path, f'-b{batch}', f'-t{threads}', f'-s{sched}'] + options[opt])
+                    output = run_binary(binary_path, [seed_path, gbz_path, f'-b{batch}', f'-t{threads}', f'-s{sched}'] + options[opt],  env_path)
 
                     # Parse and save output
                     if output is not None:
                         # If the output is from a timing measurement, we need to do some parsing
                         if 'timing' in opt:
-                            data = pd.read_csv(tmp_stderr, delimiter=",", header=None)
-                            data[4] = data[2] - data[1]
-                            grouped  = data.groupby([0, 3]).sum().reset_index()
-                            grouped[[0, 4, 3]].to_csv(output_csv, index=False)
+                           data = pd.read_csv(tmp_stderr, delimiter=",", header=None)
+                           data[4] = data[2] - data[1]
+                           grouped  = data.groupby([0, 3]).sum().reset_index()
+                           grouped[[0, 4, 3]].to_csv(output_csv, index=False)
                         else:
                             # Otherwise we just need to rename the stderr file
                             os.rename(tmp_stderr, output_csv)

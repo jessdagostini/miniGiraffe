@@ -1019,10 +1019,10 @@ int main(int argc, char *argv[]) {
     if (scheduler == "omp") {
         // OpenMP Scheduler
         omp_set_num_threads(num_threads);
-        double start, end;
         if (hw_counters) e.startCounters();
         #pragma omp parallel for shared(graph, full_result) schedule(dynamic, batch_size)
         for (int i = 0; i < size; i++) {
+            double start, end;
             if (profile) start = get_wall_time();
             extend(data[i].sequence, data[i].seeds, graph, i, full_result);
             if (profile) {

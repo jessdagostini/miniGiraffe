@@ -1022,11 +1022,10 @@ int main(int argc, char *argv[]) {
         if (hw_counters) e.startCounters();
         #pragma omp parallel for shared(graph, full_result) schedule(dynamic, batch_size)
         for (int i = 0; i < size; i++) {
-            double start, end;
-            if (profile) start = get_wall_time();
+            if (profile) start = omp_get_wtime();
             extend(data[i].sequence, data[i].seeds, graph, i, full_result);
             if (profile) {
-                double end = get_wall_time();
+                double end = omp_get_wtime();
                 time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, omp_get_thread_num());
             }
         }

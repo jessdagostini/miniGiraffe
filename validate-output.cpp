@@ -245,7 +245,9 @@ int main(int argc, char *argv[]) {
         } else {
             mismatches = count_sequences_mismatch[itr->first];
         }
-        cout << itr->first << "," << itr->second << "," << matches << "," << mismatches << endl;
+        if (mismatches > 0) {
+            cout << itr->first << "," << itr->second << "," << matches << "," << mismatches << endl;
+        }
     } 
      
 }

@@ -1015,7 +1015,6 @@ int main(int argc, char *argv[]) {
     ExtensionResult* full_result = new ExtensionResult[size];
 
     cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler." << endl;
-    cout << scheduler << endl;
     if (scheduler == "omp") {
         // OpenMP Scheduler
         omp_set_num_threads(num_threads);
@@ -1053,17 +1052,16 @@ int main(int argc, char *argv[]) {
             thread_array[i].join();
         }
 
-        cout << "Running" << endl;
+        if (hw_counters) e.startCounters();
         // Spawn threads to carry out work.
         for (int i = 0; i < num_threads; i++) {
-            if (hw_counters) e.startCounters();
             thread_array[i] = thread(work_stealing, ref(data), graph, full_result, batch_size, i, num_threads);
-            if (hw_counters){
-                e.stopCounters();
-                for (unsigned j=0; j<e.names.size(); j++) {
-                    string name = e.names[j];
-                    perf_utils_add(e.events[j].readCounter(), e.nameToIndex[name], omp_get_thread_num());
-                }
+        }
+        if (hw_counters){
+            e.stopCounters();
+            for (unsigned j=0; j<e.names.size(); j++) {
+                string name = e.names[j];
+                perf_utils_add(e.events[j].readCounter(), e.nameToIndex[name], omp_get_thread_num());
             }
         }
 

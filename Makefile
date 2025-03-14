@@ -10,18 +10,18 @@ INCLUDES = -I$(CURR_DIR) \
            -I$(CURR_DIR)/deps/gbwtgraph/include \
            -I$(CURR_DIR)/deps/gbwt/include \
            -I$(CURR_DIR)/deps/sdsl-lite/include \
-           -I$(CURR_DIR)/deps/libhandlegraph/lib/usr/local/include
-		#   -I$(CURR_DIR)/spack/opt/spack/linux-ubuntu22.04-cascadelake/gcc-11.3.0/caliper-topdown_csx-lulccioywdcebe7odyjwvanhqklu7bsd/include
+           -I$(CURR_DIR)/deps/libhandlegraph/build/usr/local/include
+	# -I$(CURR_DIR)/spack/opt/spack/linux-ubuntu22.04-cascadelake/gcc-11.3.0/caliper-topdown_csx-lulccioywdcebe7odyjwvanhqklu7bsd/include
 		#    -I/opt/intel/oneapi/vtune/2023.2.0/sdk/include/
 
 LIBS = -L$(CURR_DIR)/deps/sdsl-lite/lib \
        -L$(CURR_DIR)/deps/gbwt/lib \
-       -L$(CURR_DIR)/deps/libhandlegraph/lib/usr/local/lib \
-       -L$(CURR_DIR)/deps/gbwtgraph/lib 
+       -L$(CURR_DIR)/deps/libhandlegraph/build/usr/local/lib \
+       -L$(CURR_DIR)/deps/gbwtgraph/lib
 	#   -L$(CURR_DIR)/spack/opt/spack/linux-ubuntu22.04-cascadelake/gcc-11.3.0/caliper-topdown_csx-lulccioywdcebe7odyjwvanhqklu7bsd/lib
 	#    -L/opt/intel/oneapi/vtune/2023.2.0/lib64
 
-LDLIBS = -lgbwtgraph -lgbwt -lhandlegraph -lsdsl -ldivsufsort -ldivsufsort64 #-lcaliper  -littnotify
+LDLIBS = -lgbwtgraph -lgbwt -lhandlegraph -lsdsl -ldivsufsort -ldivsufsort64 # -lcaliper -littnotify
 
 time-utils.so: time-utils.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@

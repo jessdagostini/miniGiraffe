@@ -915,6 +915,7 @@ void usage() {
     cerr << "   -b, batch size (default: 512)" << endl;
     cerr << "   -s, scheduler [omp, ws] (default: omp)" << endl;
     cerr << "   -p, enable profiling (default: disabled)" << endl;
+    cerr << "   -o, enable sorting (default: disabled)" << endl;
     cerr << "   -m <list>, comma-separated list of hardware measurement to enable (default: disabled)" << endl;
     cerr << "              Available counters: IPC, L1CACHE, LLCACHE, BRANCHES, DTLB, ITLB" << std::endl;
     cerr << "              Not recommended to enable more than 3 hw measurement per run" << std::endl;
@@ -930,6 +931,7 @@ int main(int argc, char *argv[]) {
     const gbwtgraph::GBWTGraph* graph;
     int opt;
     double start, end; // For profiling
+    bool order = false; // Sort the data by sequence
     
     if(argc < 3) { usage(); return 0;}
 
@@ -937,13 +939,16 @@ int main(int argc, char *argv[]) {
     string filename_gbz = argv[2];
     
 
-    while ((opt = getopt(argc, argv, "hpm:t:s:b:")) != -1) {
+    while ((opt = getopt(argc, argv, "hpom:t:s:b:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
                 return 0;
             case 'p':
                 profile = true;
+                break;
+            case 'o':
+                order = true;
                 break;
             case 'm': {
                 hw_counters = true;
@@ -994,6 +999,19 @@ int main(int argc, char *argv[]) {
     if (profile) {
         double end = get_wall_time();
         time_utils_add(start, end, TimeUtilsRegions::READING_SEEDS, omp_get_thread_num());
+    }
+
+    // NEW -- sort the data by sequence trying to improve cache usage
+    if (order) {
+        cout << "Sorting seeds by sequence" << endl;
+        if (profile) start = get_wall_time();
+        sort(data.begin(), data.end(), [](const Source& a, const Source& b) -> bool {
+            return a.sequence < b.sequence;
+        });
+        if (profile) {
+            double end = get_wall_time();
+            time_utils_add(start, end, TimeUtilsRegions::SORTING_SEEDS, omp_get_thread_num());
+        }
     }
     
     cout << "Reading GBZ" << endl;

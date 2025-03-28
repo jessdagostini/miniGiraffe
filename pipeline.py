@@ -156,6 +156,8 @@ def get_cpu_info(cpu_info):
 logger = configure_log("miniGiraffe.log")
 logger.info("***Starting miniGiraffe pipeline***")
 
+mG_files = ["miniGiraffe", "perf-utils.so", "time-utils.so", "set-env.sh"]
+
 # Move to tmp to be a common folder
 try:
     # Create the tmp folder if it does not exist
@@ -164,6 +166,13 @@ try:
         logger.info(f"[Main] Created destination folder: {destination_folder}")
     else:
         logger.warning(f"[Main] Destination folder already exists: {destination_folder}")
+        # Remove any existing miniGiraffe binaries from existing folder
+        for file in mG_files:
+            existing_file_path = os.path.join(destination_folder, file)
+            if os.path.exists(existing_file_path):
+                os.remove(existing_file_path)
+                logger.info(f"[Main] Removed existing file: {existing_file_path}")
+
 except Exception as e: # Catch any other unexpected error
     logger.error(f"[Main] An unexpected error occurred: {e}")
 
@@ -178,7 +187,6 @@ download_zenodo_record(14990368, destination_folder)
 # copy_files(source_path, destination_folder)
 
 # Copy miniGiraffe binary and .so files
-mG_files = ["miniGiraffe", "perf-utils.so", "time-utils.so", "set-env.sh"]
 for file in mG_files:
     source_path = os.path.join(source_folder, file)
     copy_files(source_path, destination_folder)

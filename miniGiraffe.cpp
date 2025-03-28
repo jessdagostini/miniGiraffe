@@ -1039,6 +1039,7 @@ int main(int argc, char *argv[]) {
         if (hw_counters) e.startCounters();
         #pragma omp parallel for shared(graph, full_result) schedule(dynamic, batch_size)
         for (int i = 0; i < size; i++) {
+            double start, end; // Local to each thread
             if (profile) start = omp_get_wtime();
             extend(data[i].sequence, data[i].seeds, graph, i, full_result);
             if (profile) {

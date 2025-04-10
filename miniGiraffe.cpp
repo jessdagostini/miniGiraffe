@@ -6,6 +6,7 @@
 #include <omp.h>
 #include <cstdlib>
 #include <unistd.h>
+#include <string>
 
 // For performance monitoring
 #include "time-utils.h"
@@ -58,29 +59,43 @@ PerfEvent e;
 IOQueue Q[150];
 atomic_int finished_threads(0);
 
+void print_memory_usage(const std::string& message) {
+    std::ifstream status_file("/proc/self/status");
+    std::string line;
+    while (std::getline(status_file, line)) {
+        if (line.find("VmRSS:") == 0 || line.find("VmSize:") == 0) {
+            std::cout << message << " " << line << std::endl;
+        }
+    }
+}
+
 struct Source {
     string sequence;
     pair_hash_set seeds;
 };
 
 struct GaplessExtension {
-     // In the graph.
-    vector<gbwtgraph::handle_t>     path;
-    size_t                          offset;
-    gbwt::BidirectionalState        state;
-
-    // In the read.
-    pair<size_t, size_t>            read_interval; // where to start when going backward (first) and forward (second) 
-    vector<size_t>                  mismatch_positions;
+    uint32_t                        internal_score; // Total number of mismatches. - 4 bytes
+    uint32_t                        old_score;      // Mismatches before the current flank. - 4 bytes
 
     // Alignment properties.
-    int32_t                         score;
-    bool                            left_full, right_full;
+    int32_t                         score; // 4 bytes
 
-    // For internal use.
-    bool                            left_maximal, right_maximal;
-    uint32_t                        internal_score; // Total number of mismatches.
-    uint32_t                        old_score;      // Mismatches before the current flank.
+    size_t                          offset; // 8 bytes (64-bit systems)
+
+    // In the read.
+    pair<size_t, size_t>            read_interval; // where to start when going backward (first) and forward (second) - 16 bytes
+
+    bool                            left_full, right_full, left_maximal, right_maximal; // 1  byte each    
+
+    gbwt::BidirectionalState        state; // 48 bytes
+
+    // Trying to set dynamic variables at the end to improve locality
+    vector<size_t>                  mismatch_positions; // dynamic
+
+    // In the graph.
+    vector<gbwtgraph::handle_t>     path; // dynamic
+
 
     bool full() const { return (this->left_full & this->right_full); }
 
@@ -566,20 +581,33 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
         }
 
         GaplessExtension best_match {
-            { }, static_cast<size_t>(0), gbwt::BidirectionalState(),
-            { static_cast<size_t>(0), static_cast<size_t>(0) }, { },
-            numeric_limits<int32_t>::min(), false, false,
-            false, false, numeric_limits<uint32_t>::max(), numeric_limits<uint32_t>::max()
+            numeric_limits<uint32_t>::max(), numeric_limits<uint32_t>::max(),
+            numeric_limits<int32_t>::min(), static_cast<size_t>(0), { },
+            false, false, false, false, gbwt::BidirectionalState(),
+            { }, { }
         };
+
+        // GaplessExtension best_match {
+        //     { }, static_cast<size_t>(0), gbwt::BidirectionalState(),
+        //     { static_cast<size_t>(0), static_cast<size_t>(0) }, { },
+        //     numeric_limits<int32_t>::min(), false, false,
+        //     false, false, numeric_limits<uint32_t>::max(), numeric_limits<uint32_t>::max()
+        // };
         
         priority_queue<GaplessExtension> extensions;
-        
+
         GaplessExtension match {
-            { seed.first }, node_offset, graph->get_bd_state(seed.first),
-            { read_offset, read_offset }, { },
-            static_cast<int32_t>(0), false, false,
-            false, false, static_cast<uint32_t>(0), static_cast<uint32_t>(0)
+            static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<int32_t>(0),
+            node_offset, { read_offset, read_offset }, false, false, false, false,
+            graph->get_bd_state(seed.first), { }, { seed.first }
         };
+        
+        // GaplessExtension match {
+        //     { seed.first }, node_offset, graph->get_bd_state(seed.first),
+        //     { read_offset, read_offset }, { },
+        //     static_cast<int32_t>(0), false, false,
+        //     false, false, static_cast<uint32_t>(0), static_cast<uint32_t>(0)
+        // };
         
         size_t nd_of = match_forward(match, sequence, graph->get_sequence_view(seed.first), INFINITY_MISMATCHES);
         if (match.read_interval.first == 0) {
@@ -996,6 +1024,7 @@ int main(int argc, char *argv[]) {
     cout << "Reading seeds " << filename_dump << endl;
     if (profile) start = get_wall_time();
     if (load_seeds(filename_dump, data) == -1) { usage(); return -1;}
+    print_memory_usage("Memory usage after reading seeds:");
     if (profile) {
         double end = get_wall_time();
         time_utils_add(start, end, TimeUtilsRegions::READING_SEEDS, omp_get_thread_num());
@@ -1019,6 +1048,7 @@ int main(int argc, char *argv[]) {
         if (profile) start = get_wall_time();
         sdsl::simple_sds::load_from(gbz, filename_gbz);
         graph = &gbz.graph;
+        print_memory_usage("Memory usage after reading GBZ:");
         if (profile) {
             double end = get_wall_time();
             time_utils_add(start, end, TimeUtilsRegions::READING_GBZ, omp_get_thread_num());

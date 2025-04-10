@@ -9,7 +9,7 @@ import logging.handlers
 import requests
 
 source_folder = os.getcwd()
-destination_folder = "/tmp/miniGiraffe/"
+destination_folder = "/lscratch/jessicadagostini/miniGiraffe/"
 tmp_stdout = "./tmp_stdout.txt"
 tmp_stderr = "./tmp_stderr.txt"
 
@@ -231,7 +231,8 @@ except Exception as e: # Catch any other unexpected error
     logger.error(f"[Main] An unexpected error occurred: {e}")
 
 # Define array of tests
-batch_size = [256, 512, 1024, 2048, 4096]
+# batch_size = [256, 512, 1024, 2048, 4096]
+batch_size = [256, 512, 1024]
 
 scheduler = ['ws', 'omp']
 
@@ -239,25 +240,42 @@ max_num_threads = os.cpu_count()
 
 num_threads = []
 i = 1
-while i < max_num_threads:
-    num_threads.append(i)
-    i*=2
-if max_num_threads not in num_threads:
-    num_threads.append(max_num_threads)
+# while i < max_num_threads:
+#     num_threads.append(i)
+#     i*=2
+# if max_num_threads not in num_threads:
+#     num_threads.append(max_num_threads)
+
+num_threads = [1, 16, 32]
 
 repetitions = 3
 
+# options = {
+#     'timing' :  [
+#         '-p'
+#     ],
+#     'hwmetrics1' : [
+#         '-m',
+#         'IPC,L1CACHE,LLCACHE'
+#     ],
+#     'hwmetrics2' : [
+#         '-m',
+#         'BRANCHES,DTLB,ITLB'
+#     ]
+    
+# }
+
+# options = {
+#     'timing-sort' :  [
+#         '-p',
+#         '-o'
+#     ]
+    
+# }
+
 options = {
-    'timing' :  [
+    'timing-cache' :  [
         '-p'
-    ],
-    'hwmetrics1' : [
-        '-m',
-        'IPC,L1CACHE,LLCACHE'
-    ],
-    'hwmetrics2' : [
-        '-m',
-        'BRANCHES,DTLB,ITLB'
     ]
     
 }

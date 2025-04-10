@@ -1,1 +1,1 @@
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/miniGiraffe/deps/gbwt/lib:$HOME/miniGiraffe/deps/libhandlegraph/lib/usr/local/lib:$HOME/miniGiraffe/:$HOME/spack/opt/spack/linux-ubuntu22.04-cascadelake/gcc-11.3.0/caliper-topdown_csx-lulccioywdcebe7odyjwvanhqklu7bsd/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/miniGiraffe-amd/deps/gbwt/lib:$HOME/miniGiraffe-amd/deps/libhandlegraph/build/usr/local/lib:$HOME/miniGiraffe-amd/deps/sdsl-lite/lib:$HOME/miniGiraffe-amd/deps/gbwtgraph/lib

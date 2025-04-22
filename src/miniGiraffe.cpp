@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <string>
+#include <sstream> // Required for stringstream
 
 // For performance monitoring
 #include "time-utils.h"
@@ -59,13 +60,20 @@ PerfEvent e;
 IOQueue Q[150];
 atomic_int finished_threads(0);
 
-void print_memory_usage(const std::string& message) {
+void get_mem_usage(int openmp_thread_num) {
     std::ifstream status_file("/proc/self/status");
     std::string line;
+    std::string t1, t2;
+    double numeric_value = 0.0;
     while (std::getline(status_file, line)) {
         if (line.find("VmRSS:") == 0 || line.find("VmSize:") == 0) {
-            std::cout << message << " " << line << std::endl;
+            // std::cout << message << " " << line << std::endl;
+            std::stringstream ss(line);
+            ss >> t1 >> t2 >> numeric_value;
+            // std::cout << numeric_value << std::endl;
+            perf_utils_add(numeric_value, PerfUtilsCounters::MEMCONSUMPTION, openmp_thread_num);
         }
+        // std::cout << line << std::endl;
     }
 }
 
@@ -75,26 +83,22 @@ struct Source {
 };
 
 struct GaplessExtension {
-    uint32_t                        internal_score; // Total number of mismatches. - 4 bytes
-    uint32_t                        old_score;      // Mismatches before the current flank. - 4 bytes
-
-    // Alignment properties.
-    int32_t                         score; // 4 bytes
-
-    size_t                          offset; // 8 bytes (64-bit systems)
+    std::vector<gbwtgraph::handle_t>     path;
+    size_t                    offset;
+    gbwt::BidirectionalState  state;
 
     // In the read.
-    pair<size_t, size_t>            read_interval; // where to start when going backward (first) and forward (second) - 16 bytes
+    std::pair<size_t, size_t> read_interval; // where to start when going backward (first) and forward (second) 
+    std::vector<size_t>       mismatch_positions;
 
-    bool                            left_full, right_full, left_maximal, right_maximal; // 1  byte each    
+    // Alignment properties.
+    int32_t                   score;
+    bool                      left_full, right_full;
 
-    gbwt::BidirectionalState        state; // 48 bytes
-
-    // Trying to set dynamic variables at the end to improve locality
-    vector<size_t>                  mismatch_positions; // dynamic
-
-    // In the graph.
-    vector<gbwtgraph::handle_t>     path; // dynamic
+    // For internal use.
+    bool                      left_maximal, right_maximal;
+    uint32_t                  internal_score; // Total number of mismatches.
+    uint32_t                  old_score;      // Mismatches before the current flank.
 
 
     bool full() const { return (this->left_full & this->right_full); }
@@ -135,7 +139,7 @@ struct GaplessExtension {
         return false;
     }
 
-    size_t overlap(const gbwtgraph::GBWTGraph& graph, const GaplessExtension& another) const {
+    size_t overlap(const gbwtgraph::CachedGBWTGraph& graph, const GaplessExtension& another) const {
         size_t result = 0;
         size_t this_pos = this->read_interval.first, another_pos = another.read_interval.first;
         auto this_iter = this->path.begin(), another_iter = another.path.begin();
@@ -278,7 +282,7 @@ void match_backward(GaplessExtension& match, const string& seq, gbwtgraph::view_
 // Sort full-length extensions by internal_score, remove ones that are not
 // full-length alignments, remove duplicates, and return the best extensions
 // that have sufficiently low overlap.
-void handle_full_length(const gbwtgraph::GBWTGraph& graph, vector<GaplessExtension>& result, double overlap_threshold) {
+void handle_full_length(const gbwtgraph::CachedGBWTGraph& graph, vector<GaplessExtension>& result, double overlap_threshold) {
     sort(result.begin(), result.end(), [](const GaplessExtension& a, const GaplessExtension& b) -> bool {
         if (a.full() && b.full()) {
             return (a.internal_score < b.internal_score);
@@ -347,7 +351,7 @@ void remove_duplicates(vector<GaplessExtension>& result) {
 }
 
 // Realign the extensions to find the mismatching positions.
-void find_mismatches(const string& seq, const gbwtgraph::GBWTGraph& graph, vector<GaplessExtension>& result) {
+void find_mismatches(const string& seq, const gbwtgraph::CachedGBWTGraph& graph, vector<GaplessExtension>& result) {
     for (GaplessExtension& extension : result) {
         if (extension.internal_score == 0) {
             continue;
@@ -379,7 +383,7 @@ void set_score(GaplessExtension& extension) {
     extension.score += static_cast<int32_t>(extension.right_full * default_full_length_bonus);
 }
 
-bool process_next_state(const gbwt::BidirectionalState& next_state, GaplessExtension& curr, string sequence, const gbwtgraph::GBWTGraph* graph, uint32_t mismatch_limit, priority_queue<GaplessExtension>& extensions, size_t& num_extensions, bool& found_extension, HandlePosition direction) {
+bool process_next_state(const gbwt::BidirectionalState& next_state, GaplessExtension& curr, string sequence, const gbwtgraph::CachedGBWTGraph* graph, uint32_t mismatch_limit, priority_queue<GaplessExtension>& extensions, size_t& num_extensions, bool& found_extension, HandlePosition direction) {
     GaplessExtension next;
     next.clone(curr);
     next.state = next_state;
@@ -452,7 +456,7 @@ void in_place_subvector(vector<Element>& vec, size_t head, size_t tail) {
     vec.resize(tail - head);
 }
 
-bool trim_mismatches(GaplessExtension& extension, const gbwtgraph::GBWTGraph& graph) {
+bool trim_mismatches(GaplessExtension& extension, const gbwtgraph::CachedGBWTGraph& graph) {
 
     if (extension.mismatch_positions.empty()) {
         return false;
@@ -562,7 +566,7 @@ bool trim_mismatches(GaplessExtension& extension, const gbwtgraph::GBWTGraph& gr
     return true;
 }
 
-void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* graph, int element_index, ExtensionResult* full_result) {
+void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::CachedGBWTGraph* graph, int element_index, ExtensionResult* full_result) {
     // cout << "Extending " << sequence << endl;
     vector<GaplessExtension> result;
     result.reserve(seeds.size());
@@ -580,34 +584,34 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
             }
         }
 
-        GaplessExtension best_match {
-            numeric_limits<uint32_t>::max(), numeric_limits<uint32_t>::max(),
-            numeric_limits<int32_t>::min(), static_cast<size_t>(0), { },
-            false, false, false, false, gbwt::BidirectionalState(),
-            { }, { }
-        };
-
         // GaplessExtension best_match {
-        //     { }, static_cast<size_t>(0), gbwt::BidirectionalState(),
-        //     { static_cast<size_t>(0), static_cast<size_t>(0) }, { },
-        //     numeric_limits<int32_t>::min(), false, false,
-        //     false, false, numeric_limits<uint32_t>::max(), numeric_limits<uint32_t>::max()
+        //     numeric_limits<uint32_t>::max(), numeric_limits<uint32_t>::max(),
+        //     numeric_limits<int32_t>::min(), static_cast<size_t>(0), { },
+        //     false, false, false, false, gbwt::BidirectionalState(),
+        //     { }, { }
         // };
+
+        GaplessExtension best_match {
+            { }, static_cast<size_t>(0), gbwt::BidirectionalState(),
+            { static_cast<size_t>(0), static_cast<size_t>(0) }, { },
+            numeric_limits<int32_t>::min(), false, false,
+            false, false, numeric_limits<uint32_t>::max(), numeric_limits<uint32_t>::max()
+        };
         
         priority_queue<GaplessExtension> extensions;
 
-        GaplessExtension match {
-            static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<int32_t>(0),
-            node_offset, { read_offset, read_offset }, false, false, false, false,
-            graph->get_bd_state(seed.first), { }, { seed.first }
-        };
-        
         // GaplessExtension match {
-        //     { seed.first }, node_offset, graph->get_bd_state(seed.first),
-        //     { read_offset, read_offset }, { },
-        //     static_cast<int32_t>(0), false, false,
-        //     false, false, static_cast<uint32_t>(0), static_cast<uint32_t>(0)
+        //     static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<int32_t>(0),
+        //     node_offset, { read_offset, read_offset }, false, false, false, false,
+        //     graph->get_bd_state(seed.first), { }, { seed.first }
         // };
+        
+        GaplessExtension match {
+            { seed.first }, node_offset, graph->get_bd_state(seed.first),
+            { read_offset, read_offset }, { },
+            static_cast<int32_t>(0), false, false,
+            false, false, static_cast<uint32_t>(0), static_cast<uint32_t>(0)
+        };
         
         size_t nd_of = match_forward(match, sequence, graph->get_sequence_view(seed.first), INFINITY_MISMATCHES);
         if (match.read_interval.first == 0) {
@@ -851,7 +855,9 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
         for (int j=0; j<batchsize; j++) {
             int i = batch[j];
             if (profile) start = get_wall_time();
-            extend(data[i].sequence, data[i].seeds, graph, i, full_result);
+            const gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
+            extend(data[i].sequence, data[i].seeds, cache, i, full_result);
+            delete cache;
             if (profile) {
                 end = get_wall_time();
                 time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, tid);
@@ -874,7 +880,9 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
             for(int j=0; j<batchsize; j++) {
                 int i = batch[j];
                 if (profile) start = get_wall_time();
-                extend(data[i].sequence, data[i].seeds, graph, i, full_result);
+                const gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
+                extend(data[i].sequence, data[i].seeds, cache, i, full_result);
+                delete cache;
                 if (profile) {
                     end = get_wall_time();
                     time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, tid);
@@ -884,6 +892,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
 
         target = (target + 1) % num_threads; // Round robin.
     }
+    // delete cache;
 }
 
 int setup_counters(string optarg) {
@@ -1062,21 +1071,45 @@ int main(int argc, char *argv[]) {
     int size = data.size();
     ExtensionResult* full_result = new ExtensionResult[size];
 
-    cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler." << endl;
+    cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler and CachedGBWT Capacity " << gbwt::CachedGBWT::INITIAL_CAPACITY << endl;
     if (scheduler == "omp") {
         // OpenMP Scheduler
         omp_set_num_threads(num_threads);
         if (hw_counters) e.startCounters();
+
+        // #pragma omp parallel shared(graph, full_result)
+        // {
+        //     // Declare and initialize the thread-private cache variable
+        //     gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
+        
+        //     #pragma omp for schedule(dynamic, batch_size)
+        //     for (int i = 0; i < size; i++) {
+        //         double start, end; // Local to each thread
+        //         if (profile) start = omp_get_wtime();
+        //         extend(data[i].sequence, data[i].seeds, cache, i, full_result);
+        //         if (profile) {
+        //             double end = omp_get_wtime();
+        //             time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, omp_get_thread_num());
+        //         }
+        //     }
+        
+        //     // Clean up the thread-private cache variable
+        //     delete cache;
+        // }
+        
         #pragma omp parallel for shared(graph, full_result) schedule(dynamic, batch_size)
         for (int i = 0; i < size; i++) {
             double start, end; // Local to each thread
             if (profile) start = omp_get_wtime();
-            extend(data[i].sequence, data[i].seeds, graph, i, full_result);
+            gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
+            extend(data[i].sequence, data[i].seeds, cache, i, full_result);
+            delete cache;
             if (profile) {
                 double end = omp_get_wtime();
                 time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, omp_get_thread_num());
             }
         }
+
         if (hw_counters){
             e.stopCounters();
             for (unsigned j=0; j<e.names.size(); j++) {

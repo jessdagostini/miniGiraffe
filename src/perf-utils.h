@@ -23,7 +23,7 @@ extern long long int perfEntryPointCount;
 
 extern pthread_rwlock_t lock_perf_utils;
 
-char counters[20][40] = {"cycles", "instructions", "L1-access", "L1-misses", "LLC-access", "LLC-misses", "branch-issued", "branch-misses", "DTLB-access", "DTLB-misses", "ITLB-access", "ITLB-misses"};
+char counters[20][40] = {"cycles", "instructions", "L1-access", "L1-misses", "LLC-access", "LLC-misses", "branch-issued", "branch-misses", "DTLB-access", "DTLB-misses", "ITLB-access", "ITLB-misses", "mem-consumption"};
 
 enum PerfUtilsCounters {
     CYCLES,
@@ -37,7 +37,8 @@ enum PerfUtilsCounters {
     DTLBACCESS,
     DTLBMISSES,
     ITLBACCESS,
-    ITLBMISSES
+    ITLBMISSES,
+    MEMCONSUMPTION
 };
 
 void perf_utils_dump();

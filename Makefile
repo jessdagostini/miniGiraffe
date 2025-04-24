@@ -33,6 +33,9 @@ perf-utils.so: src/perf-utils.cpp
 miniGiraffe: src/miniGiraffe.cpp time-utils.so perf-utils.so
 	$(CXX) -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
 
+miniGiraffeNC: src/miniGiraffe-noCache.cpp time-utils.so perf-utils.so
+	$(CXX) -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
+
 main-new: src/main-new.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
 

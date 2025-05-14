@@ -860,7 +860,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
             delete cache;
             if (profile) {
                 end = get_wall_time();
-                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, tid);
+                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, 0, tid);
             }
         }
     }
@@ -885,7 +885,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
                 delete cache;
                 if (profile) {
                     end = get_wall_time();
-                    time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, tid);
+                    time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, 0, tid);
                 }
             }
         }
@@ -1036,7 +1036,7 @@ int main(int argc, char *argv[]) {
     // print_memory_usage("Memory usage after reading seeds:");
     if (profile) {
         double end = get_wall_time();
-        time_utils_add(start, end, TimeUtilsRegions::READING_SEEDS, omp_get_thread_num());
+        time_utils_add(start, end, TimeUtilsRegions::READING_SEEDS, 0, omp_get_thread_num());
     }
 
     // NEW -- sort the data by sequence trying to improve cache usage
@@ -1048,7 +1048,7 @@ int main(int argc, char *argv[]) {
         });
         if (profile) {
             double end = get_wall_time();
-            time_utils_add(start, end, TimeUtilsRegions::SORTING_SEEDS, omp_get_thread_num());
+            time_utils_add(start, end, TimeUtilsRegions::SORTING_SEEDS, 0, omp_get_thread_num());
         }
     }
     
@@ -1060,7 +1060,7 @@ int main(int argc, char *argv[]) {
         // print_memory_usage("Memory usage after reading GBZ:");
         if (profile) {
             double end = get_wall_time();
-            time_utils_add(start, end, TimeUtilsRegions::READING_GBZ, omp_get_thread_num());
+            time_utils_add(start, end, TimeUtilsRegions::READING_GBZ, 0, omp_get_thread_num());
         }
     } catch(const std::exception& e) {
         cerr << "Error reading GBZ file" << endl;
@@ -1106,7 +1106,7 @@ int main(int argc, char *argv[]) {
             delete cache;
             if (profile) {
                 double end = omp_get_wtime();
-                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, omp_get_thread_num());
+                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, 0, omp_get_thread_num());
             }
         }
 
@@ -1155,11 +1155,21 @@ int main(int argc, char *argv[]) {
 
     cout << "Finished mapping" << endl;
     cout << "Writing extensions" << endl;
+
+    // For now, we just want to make sure we have the same number of extensions when running with single and distributed
+    int local_size = 0;
+    #pragma omp parallel for reduction(+:local_size)
+    for (int i = 0; i < size; i++) {
+        local_size += full_result[i].extensions.size();
+    }
+    cout << "Found " << local_size << " extensions" << endl;
+
+
     if (profile) start = get_wall_time();
     write_extensions(full_result, size);
     if (profile) {
         double end = get_wall_time();
-        time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, omp_get_thread_num());
+        time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, 0, omp_get_thread_num());
     }
 
     if (profile) time_utils_dump();

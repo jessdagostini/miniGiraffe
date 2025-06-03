@@ -1,0 +1,129 @@
+ON MASTER NODE
+
+systemctl is-active firewalld
+    2  ifconfig
+    3  sudo apt install net-rools
+    4  sudo apt install net-tools
+    5  ifconfig
+    6  ssh cc@10.52.3.157
+    7  ssh -i .ssh/miniGiraffe cc@10.52.3.157
+    8  cd .ssh/
+    9  nano config
+   10  sudo firewall-cmd --zone=trusted --add-source=10.0.0.0/8
+   11  sudo firewall-cmd --zone=trusted --add-source=172.16.0.0/12
+   12  sudo firewall-cmd --zone=trusted --add-source=192.168.0.0/16
+   13  sudo firewall-cmd --runtime-to-permanent
+   14  cd
+   15  ssh worker-node-2
+   16  cd .ssh/
+   17  ls
+   18  cat known_hosts
+   19  clear
+   20  ls
+   21  cat config 
+   22  ssh cc@10.52.3.157
+   23  ssh cc@10.52.3.93
+   24  ssh cc@10.52.2.93
+   25  ssh cc@10.52.3.106
+   26  cd
+   27  nano hosts
+   28  mpirun
+   29  sudo apt install libopenmpi-dev
+   30  mpirun
+   31  nano mpi.cpp
+   32  mpic++ mpi.cpp -o mpi
+   33  mpirun -np 4 ./mpi
+   34  mpirun -np 4 --hostfile hosts ./mpi
+   35  ssh cc@10.52.3.106
+   36  history
+   37  ssh cc@10.52.3.157
+   38  nano .ssh/config 
+   39  ssh cc@10.52.3.157
+   40  mpirun -np 4 --hostfile hosts ./mpi
+   41  ssh cc@10.52.3.157
+   42  ssh cc@10.52.3.106
+   43  ssh cc@10.52.2.93
+   44  mpirun -np 4 --hostfile hosts ./mpi
+   45  sudo apt install nfs-kernel-server
+   46  sudo mkdir /mnt/shared
+   47  sudo chown nobody:nogroup /mnt/shared/
+   48  nano /etc/exports 
+   49  sudo nano /etc/exports 
+   50  sudo exportfs -a
+   51  sudo systemctl restart nfs-kernel-server
+   52  ls
+   53  cp mpi* /mnt/shared/.
+   54  cd /mnt/shared/
+   55  ls
+   56  nano mpi.cpp
+   57  cd ..
+   58  ls -larth
+   59  sudo chmod 775 shared/
+   60  ls -larth
+   61  cd shared/
+   62  nano mpi.cpp
+   63  sudo chmod 777 shared/
+   64  cd ..
+   65  sudo chmod 777 shared/
+   66  cd shared/
+   67  touch teste
+   68  ls
+   69  rm teste 
+   70  cp ~/mpi* .
+   71  ls
+   72  cd
+   73  ssh cc@10.52.2.93
+   74  ssh cc@10.52.3.157
+   75  ssh cc@10.52.3.106
+   76  cd /mnt/shared/
+   77  ls
+   78  mpic++ mpi.cpp -o mpi
+   79  cp ~/hosts .
+   80  mpirun -np 4 --hostfile hosts ./mpi
+   81  nano ~/.ssh/config 
+   82  mpirun -np 4 --hostfile hosts ./mpi
+   83  nano ~/.ssh/config 
+   84  mpirun -np 4 --hostfile hosts ./mpi
+   85  nano mpi.cpp 
+   86  mpic++ mpi.cpp -o mpi
+   87  mpirun -np 4 --hostfile hosts ./mpi
+   88  htop
+   89  mpirun -np 128 --hostfile hosts ./mpi
+   90  mpirun -np 64 --hostfile hosts ./mpi
+   91  mpirun -np 96 --hostfile hosts ./mpi
+   92  nano hosts 
+   93  mpirun -np 96 --hostfile hosts ./mpi
+   94  mpirun -np 128 --hostfile hosts ./mpi
+   95  git
+   96  git clone --recursive git@github.com:jessdagostini/miniGiraffe.git
+   97  cd 
+   98  cd .ssh/
+   99  ls
+  100  cd
+  101  GIT_SSH_COMMAND="ssh -i ~/.ssh/chameleon-github-private" git clone --recursive git@github.com:jessdagostini/miniGiraffe.git
+  102  ssh-keygen -t ed25519 -C "jessicadagostini@gmail.com"
+  103  cat .ssh/chameleon-github.pub 
+  104  cd /mnt/shared/
+  105  GIT_SSH_COMMAND="ssh -i ~/.ssh/chameleon-github-private" git clone --recursive git@github.com:jessdagostini/miniGiraffe.git
+  106  git clone --recursive git@github.com:jessdagostini/miniGiraffe.git
+  107  ls
+  108  GIT_SSH_COMMAND="ssh -i ~/.ssh/chameleon-github" git clone --recursive git@github.com:jessdagostini/miniGiraffe.git
+  109  cd miniGiraffe/
+  110  ls
+  111  make miniGiraffeMPI
+  112  git checkout arch
+
+
+ON WORKER NODE
+sudo apt-get update
+    3  sudo apt-get upgrade
+    4  sudo apt-get install libopenmpi-dev
+    5  exit
+    6  sudo apt install nfs-common
+    7  mkdir /mnt/shared
+    8  sudo mkdir /mnt/shared
+    9  cd /mnt/
+   10  ls
+   11  sudo chmod 777 shared/
+   12  sudo mount -t nfs 10.52.0.61:/mnt/shared /mnt/shared/
+   13  cd shared/

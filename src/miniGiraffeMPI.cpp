@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <string>
 #include <sstream> // Required for stringstream
+#include <mpi.h>
 
 // For performance monitoring
 #include "time-utils.h"
@@ -53,12 +54,8 @@ constexpr static double OVERLAP_THRESHOLD = 0.8;
 constexpr static size_t MAX_MISMATCHES = 4;
 const uint64_t DEFAULT_PARALLEL_BATCHSIZE = 512;
 const uint32_t INFINITY_MISMATCHES = 1000000;
-
-// Options
 bool profile = false;
 bool hw_counters = false;
-bool write_output = false;
-uint64_t cache_capacity = 0;
 PerfEvent e;
 
 IOQueue Q[150];
@@ -87,23 +84,23 @@ struct Source {
 };
 
 struct GaplessExtension {
-     // In the graph.
-    vector<gbwtgraph::handle_t>     path;
-    size_t                          offset;
-    gbwt::BidirectionalState        state;
+    std::vector<gbwtgraph::handle_t>     path;
+    size_t                    offset;
+    gbwt::BidirectionalState  state;
 
     // In the read.
-    pair<size_t, size_t>            read_interval; // where to start when going backward (first) and forward (second) 
-    vector<size_t>                  mismatch_positions;
+    std::pair<size_t, size_t> read_interval; // where to start when going backward (first) and forward (second) 
+    std::vector<size_t>       mismatch_positions;
 
     // Alignment properties.
-    int32_t                         score;
-    bool                            left_full, right_full;
+    int32_t                   score;
+    bool                      left_full, right_full;
 
     // For internal use.
-    bool                            left_maximal, right_maximal;
-    uint32_t                        internal_score; // Total number of mismatches.
-    uint32_t                        old_score;      // Mismatches before the current flank.
+    bool                      left_maximal, right_maximal;
+    uint32_t                  internal_score; // Total number of mismatches.
+    uint32_t                  old_score;      // Mismatches before the current flank.
+
 
     bool full() const { return (this->left_full & this->right_full); }
 
@@ -690,8 +687,8 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::CachedGBWTG
 
     // If we have a good enough full-length alignment, return the best sufficiently
     // distinct full-length alignments.
-    // size_t max_mismatches = 100;
-    // double start = omp_get_wtime();
+    size_t max_mismatches = 100;
+    double start = omp_get_wtime();
     if (best_alignment < result.size() && result[best_alignment].internal_score <= MAX_MISMATCHES) {
         handle_full_length(*graph, result, OVERLAP_THRESHOLD);
         find_mismatches(sequence, *graph, result);
@@ -714,6 +711,11 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::CachedGBWTG
     // double end = omp_get_wtime();
     // time_utils_add(start, end, TimeUtilsRegions::TRIM_EXTENSIONS, omp_get_thread_num());
 
+    // Free the cache if we allocated it.
+    // if (free_cache) {
+    //     delete cache;
+    //     cache = nullptr;
+    // }
     
     full_result[element_index].sequence = sequence;
     full_result[element_index].extensions = result;
@@ -777,6 +779,44 @@ void write_extensions(ExtensionResult* results, int size) {
     
     // Close the file stream
     outFile.close();
+}
+
+size_t calculate_serialized_size(const ExtensionResult& result) {
+    size_t total_size = (result.sequence.size() + 1) * sizeof(char); // Sequence data size + null terminator
+    total_size += sizeof(size_t); // Number of extensions
+    for (const auto& extension : result.extensions) {
+        total_size += sizeof(extension.offset);
+        total_size += sizeof(extension.read_interval);
+        total_size += sizeof(extension.score);
+        total_size += sizeof(size_t); // Number of mismatches
+        total_size += extension.mismatch_positions.size() * sizeof(size_t); // Mismatch positions
+    }
+    return total_size;
+}
+
+void serialize_extension_result(const ExtensionResult& result, char* buffer, size_t& offset) {
+    size_t sequence_size = result.sequence.size();
+    memcpy(buffer + offset, result.sequence.c_str(), sequence_size + 1);
+    offset += sequence_size + 1; // Include null terminator
+
+    size_t num_extensions = result.extensions.size();
+    memcpy(buffer + offset, &num_extensions, sizeof(num_extensions));
+    offset += sizeof(num_extensions);
+
+    for (const auto& extension : result.extensions) {
+        memcpy(buffer + offset, &extension.offset, sizeof(extension.offset));
+        offset += sizeof(extension.offset);
+        memcpy(buffer + offset, &extension.read_interval, sizeof(extension.read_interval));
+        offset += sizeof(extension.read_interval);
+        memcpy(buffer + offset, &extension.score, sizeof(extension.score));
+        offset += sizeof(extension.score);
+
+        size_t num_mismatches = extension.mismatch_positions.size();
+        memcpy(buffer + offset, &num_mismatches, sizeof(num_mismatches));
+        offset += sizeof(num_mismatches);
+        memcpy(buffer + offset, extension.mismatch_positions.data(), num_mismatches * sizeof(size_t));
+        offset += num_mismatches * sizeof(size_t);
+    }
 }
 
 int load_seeds(string filename, vector<Source> &data) {
@@ -850,19 +890,19 @@ void dist_workload(int chunk_size, int size, int tid, int num_threads) {
   }
 }
 
-void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, ExtensionResult* full_result, int batchsize, int tid, int num_threads) {
+void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, ExtensionResult* full_result, int batchsize, int tid, int num_threads, int rank) {
     double start, end;
     int* batch = (int*)malloc(batchsize * sizeof(int));
     for (int r = Q[tid].deq_batch(batch, batchsize); r != -1; r = Q[tid].deq_batch(batch, batchsize)) {
         for (int j=0; j<batchsize; j++) {
             int i = batch[j];
             if (profile) start = get_wall_time();
-            const gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph), cache_capacity);
+            const gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
             extend(data[i].sequence, data[i].seeds, cache, i, full_result);
             delete cache;
             if (profile) {
                 end = get_wall_time();
-                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, tid);
+                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, rank, tid);
             }
         }
     }
@@ -882,18 +922,19 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
             for(int j=0; j<batchsize; j++) {
                 int i = batch[j];
                 if (profile) start = get_wall_time();
-                const gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph), cache_capacity);
+                const gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
                 extend(data[i].sequence, data[i].seeds, cache, i, full_result);
                 delete cache;
                 if (profile) {
                     end = get_wall_time();
-                    time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, tid);
+                    time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, rank, tid);
                 }
             }
         }
 
         target = (target + 1) % num_threads; // Round robin.
     }
+    // delete cache;
 }
 
 int setup_counters(string optarg) {
@@ -950,11 +991,10 @@ void usage() {
     cerr << "Usage miniGiraffe [seed_file] [gbz_file] [options]" << endl;
     cerr << "Options: " << endl;
     cerr << "   -t, number of threads (default: max # threads in system)" << endl;
-    cerr << "   -c, initial GBWTcache capacity (default: 256)" << endl;
     cerr << "   -b, batch size (default: 512)" << endl;
     cerr << "   -s, scheduler [omp, ws] (default: omp)" << endl;
     cerr << "   -p, enable profiling (default: disabled)" << endl;
-    cerr << "   -o, write extension output (default: disabled)" << endl;
+    cerr << "   -o, enable sorting (default: disabled)" << endl;
     cerr << "   -m <list>, comma-separated list of hardware measurements to enable (default: disabled)" << endl;
     cerr << "              Available counters: IPC, L1CACHE, LLCACHE, BRANCHES, DTLB, ITLB" << std::endl;
     cerr << "              Not recommended to enable more than 3 hw measurement per run" << std::endl;
@@ -970,6 +1010,18 @@ int main(int argc, char *argv[]) {
     const gbwtgraph::GBWTGraph* graph;
     int opt;
     double start, end; // For profiling
+    bool order = false; // Sort the data by sequence
+    int ranks, rank;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &ranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    char hostname[MPI_MAX_PROCESSOR_NAME];
+    int hostname_len;
+    MPI_Get_processor_name(hostname, &hostname_len);
+    //MPI_File file;
+    //MPI_File_open(MPI_COMM_WORLD, "output.bin", MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &file);
     
     if(argc < 3) { usage(); return 0;}
 
@@ -977,13 +1029,16 @@ int main(int argc, char *argv[]) {
     string filename_gbz = argv[2];
     
 
-    while ((opt = getopt(argc, argv, "hpm:ot:s:b:c:")) != -1) {
+    while ((opt = getopt(argc, argv, "hpom:t:s:b:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
                 return 0;
             case 'p':
                 profile = true;
+                break;
+            case 'o':
+                order = true;
                 break;
             case 'm': {
                 hw_counters = true;
@@ -993,20 +1048,9 @@ int main(int argc, char *argv[]) {
                 }
                 break;
             }
-            case 'o':
-                write_output = true;
-                break;
             case 't':
                 try {
                     num_threads = stoi(optarg);
-                } catch (const std::invalid_argument& e) {
-                    std::cerr << "Error: Option -t requires an integer value.\n";
-                    return 1;
-                }
-                break;
-            case 'c':
-                try {
-                    cache_capacity = stoi(optarg);
                 } catch (const std::invalid_argument& e) {
                     std::cerr << "Error: Option -t requires an integer value.\n";
                     return 1;
@@ -1039,16 +1083,16 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    cout << "Reading seeds " << filename_dump << endl;
+    cout << "[Rank " << hostname << "/" << rank << "] Reading seeds " << filename_dump << endl;
     if (profile) start = get_wall_time();
     if (load_seeds(filename_dump, data) == -1) { usage(); return -1;}
     // print_memory_usage("Memory usage after reading seeds:");
     if (profile) {
         double end = get_wall_time();
-        time_utils_add(start, end, TimeUtilsRegions::READING_SEEDS, omp_get_thread_num());
+        time_utils_add(start, end, TimeUtilsRegions::READING_SEEDS, rank, omp_get_thread_num());
     }
     
-    cout << "Reading GBZ" << endl;
+    cout << "[Rank " << hostname << "/" << rank << "] Reading GBZ" << endl;
     try {
         if (profile) start = get_wall_time();
         sdsl::simple_sds::load_from(gbz, filename_gbz);
@@ -1056,7 +1100,7 @@ int main(int argc, char *argv[]) {
         // print_memory_usage("Memory usage after reading GBZ:");
         if (profile) {
             double end = get_wall_time();
-            time_utils_add(start, end, TimeUtilsRegions::READING_GBZ, omp_get_thread_num());
+            time_utils_add(start, end, TimeUtilsRegions::READING_GBZ, rank, omp_get_thread_num());
         }
     } catch(const std::exception& e) {
         cerr << "Error reading GBZ file" << endl;
@@ -1064,28 +1108,38 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    int size = data.size();
-    ExtensionResult* full_result = new ExtensionResult[size];
+    // Divide data across MPI ranks
+    int rank_size = data.size() / ranks;
+    int rank_start = rank * rank_size;
+    int rank_end = rank * rank_size + rank_size;
+    if (rank == ranks - 1) {
+        rank_end = data.size() - 1;
+    }
 
-    cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler and CachedGBWT Capacity " << (cache_capacity > 0 ? cache_capacity : gbwt::CachedGBWT::INITIAL_CAPACITY) << endl;
+    int size = rank_end - rank_start;
+    ExtensionResult* local_result = new ExtensionResult[size];
+    ExtensionResult* full_result = new ExtensionResult[data.size()];    
+
+    cout << "[Rank " << hostname << "/" << rank << "] Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler and CachedGBWT Capacity " << gbwt::CachedGBWT::INITIAL_CAPACITY << " and goes from " << rank_start << " to " << rank_end << endl;
     if (scheduler == "omp") {
         // OpenMP Scheduler
         omp_set_num_threads(num_threads);
         if (hw_counters) e.startCounters();
         
-        #pragma omp parallel for shared(graph, full_result) schedule(dynamic, batch_size)
-        for (int i = 0; i < size; i++) {
+        #pragma omp parallel for shared(graph, local_result) schedule(dynamic, batch_size)
+        for (int i = rank_start; i < rank_end; i++) {
+            // cout << "[Rank " << rank << "] Entrou loop " << i << endl;
             double start, end; // Local to each thread
             if (profile) start = omp_get_wtime();
-            gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph), cache_capacity);
-            extend(data[i].sequence, data[i].seeds, cache, i, full_result);
+            gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
+            extend(data[i].sequence, data[i].seeds, cache, i - rank_start, local_result);
             delete cache;
             if (profile) {
                 double end = omp_get_wtime();
-                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, omp_get_thread_num());
-                
+                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, rank, omp_get_thread_num());
             }
         }
+        cout << "[Rank " << hostname << "/" << rank << "] Finished mapping" << endl;
 
         if (hw_counters){
             e.stopCounters();
@@ -1114,7 +1168,7 @@ int main(int argc, char *argv[]) {
         if (hw_counters) e.startCounters();
         // Spawn threads to carry out work.
         for (int i = 0; i < num_threads; i++) {
-            thread_array[i] = thread(work_stealing, ref(data), graph, full_result, batch_size, i, num_threads);
+            thread_array[i] = thread(work_stealing, ref(data), graph, full_result, batch_size, i, num_threads, rank);
         }
         if (hw_counters){
             e.stopCounters();
@@ -1130,28 +1184,77 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    cout << "Finished mapping" << endl;
-    cout << "Writing extensions" << endl;
-
-    if (write_output) {
-        if (profile) start = get_wall_time();
-        write_extensions(full_result, size);
-        if (profile) {
-            double end = get_wall_time();
-            time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, omp_get_thread_num());
-        }
-    } else {
-        // For now, we just want to make sure we have the same number of extensions when running with single and distributed
-        int local_size = 0;
-        #pragma omp parallel for reduction(+:local_size)
-        for (int i = 0; i < size; i++) {
-            local_size += full_result[i].extensions.size();
-        }
-        cout << "Found " << local_size << " extensions" << endl;
+    // For now, we just want to make sure we have the same number of extensions when running with single and distributed
+    int local_size = 0;
+    #pragma omp parallel for reduction(+:local_size)
+    for (int i = 0; i < size; i++) {
+        local_size += local_result[i].extensions.size();
     }
+    cout << "Rank [" << hostname << "/" << rank << "] Found " << local_size << " extensions" << endl;
+    
+    
+    // cout << "[Rank " << rank << "] Start writing - prepare data" << endl;
+    // size_t local_size = 0;
+    // #pragma omp parallel for reduction(+:local_size)
+    // for (int i = 0; i < size; i++) {
+    //     local_size += calculate_serialized_size(local_result[i]);
+    // }
 
-    if (profile) time_utils_dump();
+    // std::vector<size_t> all_sizes(ranks, 0);
+    // MPI_Allgather(&local_size, 1, MPI_UNSIGNED_LONG, all_sizes.data(), 1, MPI_UNSIGNED_LONG, MPI_COMM_WORLD);
+
+
+    // char* buffer = new char[local_size];
+    // size_t offset = 0;
+    // for (int i = 0; i < size; i++) {
+    //     serialize_extension_result(local_result[i], buffer, offset);
+    // }
+    // // Set offset considering other ranks
+    // for (int i = 0; i < rank; i++) {
+    //     offset += all_sizes[i];
+    // }
+    
+    // cout << "[Rank " << rank << "] Write on file" << endl;
+    // MPI_File_write_at(file, offset, buffer, local_size, MPI_BYTE, MPI_STATUS_IGNORE);
+    // delete[] buffer;
+
+    // delete[] local_result;
+
+    // cout << "Finished mapping" << endl;
+    // if (rank == 0) {
+    //     cout << "Writing extensions" << endl;
+    //     if (profile) start = get_wall_time();
+    //     write_extensions(full_result, data.size());
+    //     if (profile) {
+    //         double end = get_wall_time();
+    //         time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, omp_get_thread_num());
+    //     }
+    // }
+
+    if (profile) {
+        if (rank == 0) {
+            time_utils_dump();
+            if (ranks > 1) {
+                cout << "Rank " << rank << " sending token to Rank 1." << std::endl;
+                // The content of the message doesn't matter, just its arrival (nullptr, 0 bytes).
+                MPI_Send(nullptr, 0, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+            }
+        } else {
+            std::cout << "Rank " << rank << " waiting for token from Rank " << rank - 1 << "." << std::endl;
+            MPI_Recv(nullptr, 0, MPI_BYTE, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            std::cout << "Rank " << rank << " received token from Rank " << rank - 1 << "." << std::endl;
+            time_utils_dump();
+            if (rank < ranks - 1) {
+                std::cout << "Rank " << rank << " sending token to Rank " << rank + 1 << "." << std::endl;
+                MPI_Send(nullptr, 0, MPI_BYTE, rank + 1, 0, MPI_COMM_WORLD);
+            }
+
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     if (hw_counters) perf_utils_dump();
+
+    MPI_Finalize();
 
     return 0;
 }

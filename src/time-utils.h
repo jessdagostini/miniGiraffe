@@ -37,6 +37,6 @@ enum TimeUtilsRegions {
 
 void time_utils_dump();
 
-void time_utils_add(double start, double end, int id_func, int rank, int thread);
+void time_utils_add(double start, double end, int id_func, int thread);
 void time_utils_add(double duration, int id_func);
 // #endif

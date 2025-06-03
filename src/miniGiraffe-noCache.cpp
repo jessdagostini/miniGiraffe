@@ -51,12 +51,32 @@ constexpr static double OVERLAP_THRESHOLD = 0.8;
 constexpr static size_t MAX_MISMATCHES = 4;
 const uint64_t DEFAULT_PARALLEL_BATCHSIZE = 512;
 const uint32_t INFINITY_MISMATCHES = 1000000;
+
+// Options
 bool profile = false;
 bool hw_counters = false;
+bool write_output = false;
 PerfEvent e;
 
 IOQueue Q[150];
 atomic_int finished_threads(0);
+
+void get_mem_usage(int openmp_thread_num) {
+    std::ifstream status_file("/proc/self/status");
+    std::string line;
+    std::string t1, t2;
+    double numeric_value = 0.0;
+    while (std::getline(status_file, line)) {
+        if (line.find("VmRSS:") == 0 || line.find("VmSize:") == 0) {
+            // std::cout << message << " " << line << std::endl;
+            std::stringstream ss(line);
+            ss >> t1 >> t2 >> numeric_value;
+            // std::cout << numeric_value << std::endl;
+            perf_utils_add(numeric_value, PerfUtilsCounters::MEMCONSUMPTION, openmp_thread_num);
+        }
+        // std::cout << line << std::endl;
+    }
+}
 
 struct Source {
     string sequence;
@@ -674,12 +694,6 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::GBWTGraph* 
             remove_duplicates(result);
         }
     }
-
-    // Free the cache if we allocated it.
-    // if (free_cache) {
-    //     delete cache;
-    //     cache = nullptr;
-    // }
     
     full_result[element_index].sequence = sequence;
     full_result[element_index].extensions = result;
@@ -915,7 +929,8 @@ void usage() {
     cerr << "   -b, batch size (default: 512)" << endl;
     cerr << "   -s, scheduler [omp, ws] (default: omp)" << endl;
     cerr << "   -p, enable profiling (default: disabled)" << endl;
-    cerr << "   -m <list>, comma-separated list of hardware measurement to enable (default: disabled)" << endl;
+    cerr << "   -o, write extension output (default: disabled)" << endl;
+    cerr << "   -m <list>, comma-separated list of hardware measurements to enable (default: disabled)" << endl;
     cerr << "              Available counters: IPC, L1CACHE, LLCACHE, BRANCHES, DTLB, ITLB" << std::endl;
     cerr << "              Not recommended to enable more than 3 hw measurement per run" << std::endl;
     cerr << "              given hardware counters constraints" << std::endl;
@@ -937,7 +952,7 @@ int main(int argc, char *argv[]) {
     string filename_gbz = argv[2];
     
 
-    while ((opt = getopt(argc, argv, "hpm:t:s:b:")) != -1) {
+    while ((opt = getopt(argc, argv, "hpmo:t:s:b:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
@@ -953,6 +968,9 @@ int main(int argc, char *argv[]) {
                 }
                 break;
             }
+            case 'o':
+                write_output = true;
+                break;
             case 't':
                 try {
                     num_threads = stoi(optarg);
@@ -1074,11 +1092,22 @@ int main(int argc, char *argv[]) {
 
     cout << "Finished mapping" << endl;
     cout << "Writing extensions" << endl;
-    if (profile) start = get_wall_time();
-    write_extensions(full_result, size);
-    if (profile) {
-        double end = get_wall_time();
-        time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, omp_get_thread_num());
+
+    if (write_output) {
+        if (profile) start = get_wall_time();
+        write_extensions(full_result, size);
+        if (profile) {
+            double end = get_wall_time();
+            time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, omp_get_thread_num());
+        }
+    } else {
+        // For now, we just want to make sure we have the same number of extensions when running with single and distributed
+        int local_size = 0;
+        #pragma omp parallel for reduction(+:local_size)
+        for (int i = 0; i < size; i++) {
+            local_size += full_result[i].extensions.size();
+        }
+        cout << "Found " << local_size << " extensions" << endl;
     }
 
     if (profile) time_utils_dump();

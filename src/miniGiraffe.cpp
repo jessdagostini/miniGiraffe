@@ -53,8 +53,12 @@ constexpr static double OVERLAP_THRESHOLD = 0.8;
 constexpr static size_t MAX_MISMATCHES = 4;
 const uint64_t DEFAULT_PARALLEL_BATCHSIZE = 512;
 const uint32_t INFINITY_MISMATCHES = 1000000;
+
+// Options
 bool profile = false;
 bool hw_counters = false;
+bool write_output = false;
+uint64_t cache_capacity = 0;
 PerfEvent e;
 
 IOQueue Q[150];
@@ -687,6 +691,7 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::CachedGBWTG
     // If we have a good enough full-length alignment, return the best sufficiently
     // distinct full-length alignments.
     // size_t max_mismatches = 100;
+    // double start = omp_get_wtime();
     if (best_alignment < result.size() && result[best_alignment].internal_score <= MAX_MISMATCHES) {
         handle_full_length(*graph, result, OVERLAP_THRESHOLD);
         find_mismatches(sequence, *graph, result);
@@ -706,12 +711,9 @@ void extend(string& sequence, pair_hash_set& seeds, const gbwtgraph::CachedGBWTG
             remove_duplicates(result);
         }
     }
+    // double end = omp_get_wtime();
+    // time_utils_add(start, end, TimeUtilsRegions::TRIM_EXTENSIONS, omp_get_thread_num());
 
-    // Free the cache if we allocated it.
-    // if (free_cache) {
-    //     delete cache;
-    //     cache = nullptr;
-    // }
     
     full_result[element_index].sequence = sequence;
     full_result[element_index].extensions = result;
@@ -855,7 +857,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
         for (int j=0; j<batchsize; j++) {
             int i = batch[j];
             if (profile) start = get_wall_time();
-            const gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
+            const gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph), cache_capacity);
             extend(data[i].sequence, data[i].seeds, cache, i, full_result);
             delete cache;
             if (profile) {
@@ -880,7 +882,7 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
             for(int j=0; j<batchsize; j++) {
                 int i = batch[j];
                 if (profile) start = get_wall_time();
-                const gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
+                const gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph), cache_capacity);
                 extend(data[i].sequence, data[i].seeds, cache, i, full_result);
                 delete cache;
                 if (profile) {
@@ -892,7 +894,6 @@ void work_stealing(vector<Source>& data, const gbwtgraph::GBWTGraph* graph, Exte
 
         target = (target + 1) % num_threads; // Round robin.
     }
-    // delete cache;
 }
 
 int setup_counters(string optarg) {
@@ -949,10 +950,11 @@ void usage() {
     cerr << "Usage miniGiraffe [seed_file] [gbz_file] [options]" << endl;
     cerr << "Options: " << endl;
     cerr << "   -t, number of threads (default: max # threads in system)" << endl;
+    cerr << "   -c, initial GBWTcache capacity (default: 256)" << endl;
     cerr << "   -b, batch size (default: 512)" << endl;
     cerr << "   -s, scheduler [omp, ws] (default: omp)" << endl;
     cerr << "   -p, enable profiling (default: disabled)" << endl;
-    cerr << "   -o, enable sorting (default: disabled)" << endl;
+    cerr << "   -o, write extension output (default: disabled)" << endl;
     cerr << "   -m <list>, comma-separated list of hardware measurements to enable (default: disabled)" << endl;
     cerr << "              Available counters: IPC, L1CACHE, LLCACHE, BRANCHES, DTLB, ITLB" << std::endl;
     cerr << "              Not recommended to enable more than 3 hw measurement per run" << std::endl;
@@ -968,7 +970,6 @@ int main(int argc, char *argv[]) {
     const gbwtgraph::GBWTGraph* graph;
     int opt;
     double start, end; // For profiling
-    bool order = false; // Sort the data by sequence
     
     if(argc < 3) { usage(); return 0;}
 
@@ -976,16 +977,13 @@ int main(int argc, char *argv[]) {
     string filename_gbz = argv[2];
     
 
-    while ((opt = getopt(argc, argv, "hpom:t:s:b:")) != -1) {
+    while ((opt = getopt(argc, argv, "hpm:ot:s:b:c:")) != -1) {
         switch (opt) {
             case 'h':
                 usage();
                 return 0;
             case 'p':
                 profile = true;
-                break;
-            case 'o':
-                order = true;
                 break;
             case 'm': {
                 hw_counters = true;
@@ -995,9 +993,20 @@ int main(int argc, char *argv[]) {
                 }
                 break;
             }
+            case 'o':
+                write_output = true;
+                break;
             case 't':
                 try {
                     num_threads = stoi(optarg);
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Error: Option -t requires an integer value.\n";
+                    return 1;
+                }
+                break;
+            case 'c':
+                try {
+                    cache_capacity = stoi(optarg);
                 } catch (const std::invalid_argument& e) {
                     std::cerr << "Error: Option -t requires an integer value.\n";
                     return 1;
@@ -1038,19 +1047,6 @@ int main(int argc, char *argv[]) {
         double end = get_wall_time();
         time_utils_add(start, end, TimeUtilsRegions::READING_SEEDS, omp_get_thread_num());
     }
-
-    // NEW -- sort the data by sequence trying to improve cache usage
-    if (order) {
-        cout << "Sorting seeds by sequence" << endl;
-        if (profile) start = get_wall_time();
-        sort(data.begin(), data.end(), [](const Source& a, const Source& b) -> bool {
-            return a.sequence < b.sequence;
-        });
-        if (profile) {
-            double end = get_wall_time();
-            time_utils_add(start, end, TimeUtilsRegions::SORTING_SEEDS, omp_get_thread_num());
-        }
-    }
     
     cout << "Reading GBZ" << endl;
     try {
@@ -1071,42 +1067,23 @@ int main(int argc, char *argv[]) {
     int size = data.size();
     ExtensionResult* full_result = new ExtensionResult[size];
 
-    cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler and CachedGBWT Capacity " << gbwt::CachedGBWT::INITIAL_CAPACITY << endl;
+    cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler and CachedGBWT Capacity " << (cache_capacity > 0 ? cache_capacity : gbwt::CachedGBWT::INITIAL_CAPACITY) << endl;
     if (scheduler == "omp") {
         // OpenMP Scheduler
         omp_set_num_threads(num_threads);
         if (hw_counters) e.startCounters();
-
-        // #pragma omp parallel shared(graph, full_result)
-        // {
-        //     // Declare and initialize the thread-private cache variable
-        //     gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
-        
-        //     #pragma omp for schedule(dynamic, batch_size)
-        //     for (int i = 0; i < size; i++) {
-        //         double start, end; // Local to each thread
-        //         if (profile) start = omp_get_wtime();
-        //         extend(data[i].sequence, data[i].seeds, cache, i, full_result);
-        //         if (profile) {
-        //             double end = omp_get_wtime();
-        //             time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, omp_get_thread_num());
-        //         }
-        //     }
-        
-        //     // Clean up the thread-private cache variable
-        //     delete cache;
-        // }
         
         #pragma omp parallel for shared(graph, full_result) schedule(dynamic, batch_size)
         for (int i = 0; i < size; i++) {
             double start, end; // Local to each thread
             if (profile) start = omp_get_wtime();
-            gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
+            gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph), cache_capacity);
             extend(data[i].sequence, data[i].seeds, cache, i, full_result);
             delete cache;
             if (profile) {
                 double end = omp_get_wtime();
                 time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, omp_get_thread_num());
+                
             }
         }
 
@@ -1155,11 +1132,22 @@ int main(int argc, char *argv[]) {
 
     cout << "Finished mapping" << endl;
     cout << "Writing extensions" << endl;
-    if (profile) start = get_wall_time();
-    write_extensions(full_result, size);
-    if (profile) {
-        double end = get_wall_time();
-        time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, omp_get_thread_num());
+
+    if (write_output) {
+        if (profile) start = get_wall_time();
+        write_extensions(full_result, size);
+        if (profile) {
+            double end = get_wall_time();
+            time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, omp_get_thread_num());
+        }
+    } else {
+        // For now, we just want to make sure we have the same number of extensions when running with single and distributed
+        int local_size = 0;
+        #pragma omp parallel for reduction(+:local_size)
+        for (int i = 0; i < size; i++) {
+            local_size += full_result[i].extensions.size();
+        }
+        cout << "Found " << local_size << " extensions" << endl;
     }
 
     if (profile) time_utils_dump();

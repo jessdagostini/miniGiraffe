@@ -45,7 +45,17 @@ struct Source {
     pair_hash_set seeds;
 };
 
-void load_seeds(string filename, vector<Source> &data, size_t size) {
+string modifyFilenameString(const string& filename, const string& suffix) {
+    size_t lastDotPos = filename.rfind('.');
+    if (lastDotPos == string::npos) { // No extension
+        return filename + suffix;
+    }
+    string baseName = filename.substr(0, lastDotPos);
+    string extension = filename.substr(lastDotPos);
+    return baseName + suffix + extension;
+}
+
+void load_seeds(string filename, vector<Source> &data) {
     // Open the file in binary mode for reading
     ifstream file(filename, ios::binary);
 
@@ -78,34 +88,36 @@ void load_seeds(string filename, vector<Source> &data, size_t size) {
                 // End of file reached
                 break;
             } else {
-                std::cerr << "Error reading from the file." << std::endl;
+                cerr << "Error reading from the file." << endl;
                 return;
             }
         }
         
         data.push_back(tmpData);
         tmpData = Source();
-        if (++q == size) {
-            break;
-        }
+        // if (++q == size) {
+        //     break;
+        // }
     }
 
     // Close the file
     file.close();
 }
 
-void write_seeds(string fileName, vector<Source> &data) {
+void write_seeds(string fileName, vector<Source> &data, size_t size) {
     // Create an output file stream
-    std::ofstream outFile(fileName, std::ios::binary | std::ios::app);
+    ofstream outFile(fileName, ios::binary | ios::app);
 
     if (!outFile) {
-        std::cerr << "Error opening file: " << fileName << std::endl;
+        cerr << "Error opening file: " << fileName << endl;
     }
+
+    int q = 0;
 
     for (auto d:data) {
         // Write string to the file
         if (d.sequence.empty() || d.sequence.size() == 0) {
-            std::cerr << "EMPTY SEQUENCE" << std::endl;
+            cerr << "EMPTY SEQUENCE" << endl;
         }
         outFile.write(d.sequence.c_str(), d.sequence.size() + 1); // Include null terminator
         
@@ -120,7 +132,13 @@ void write_seeds(string fileName, vector<Source> &data) {
             // Write int64_t to the file
             outFile.write(reinterpret_cast<const char*>(&seed.second), sizeof(seed.second));
         }
+
+        if (++q == size) {
+            break;
+        }
     }
+
+    cout << "Final q value: " << q << endl;
 
     // Close the file stream
     outFile.close();
@@ -129,23 +147,19 @@ void write_seeds(string fileName, vector<Source> &data) {
 int main(int argc, char *argv[]) {
     vector<Source> dump;
 
-    // size_t size = static_cast<size_t>(atoi(argv[1]));
-
-    string filename_dump = argv[2];
+    string filename_dump = argv[1];
 
     load_seeds(filename_dump, dump);
 
-    // string filename_new_dump = argv[3];
+    size_t new_size = dump.size() * 10 / 100; // Reduce to 10% of the original size
 
-    // write_seeds(filename_new_dump, dump);
-    
-    for (auto d : dump) {
-        cout << "Sequence: " << d.sequence << endl;
-        cout << "Seeds: " << d.seeds.size() << endl;
-        for (auto seed : d.seeds) {
-            cout << "Seed: " << string(seed.first.data, sizeof(seed.first.data)) 
-                 << ", Position: " << seed.second << endl;
-        }
-    }
+    cout << "Dump size: " << dump.size() << endl;
+    cout << "New size: " << new_size << endl;
+
+    string filename_new_dump = argv[2];
+    cout << "New dump filename: " << filename_new_dump << endl;
+
+    write_seeds(filename_new_dump, dump, new_size);
+
     return 0;
 }

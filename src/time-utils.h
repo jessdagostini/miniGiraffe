@@ -25,14 +25,16 @@ extern long long int entryPointCount;
 
 extern pthread_rwlock_t lock_time_utils;
 
-char regions[5][40] = {"reading-seeds", "reading-gbz", "writing-output", "seeds-loop", "sorting-seeds"};
+char regions[7][40] = {"reading-seeds", "reading-gbz", "writing-output", "seeds-loop", "sorting-seeds", "trimming-extensions", "processed-seeds"};
 
 enum TimeUtilsRegions {
     READING_SEEDS,      // Automatically assigned 0
     READING_GBZ,        // Automatically assigned 1
     WRITING_OUTPUT,     // Automatically assigned 2
     SEEDS_LOOP,         // Automatically assigned 3
-    SORTING_SEEDS       // Automatically assigned 4
+    SORTING_SEEDS,       // Automatically assigned 4
+    TRIM_EXTENSIONS,   // Automatically assigned 5
+    PROCESSED_SEEDS // Automatically assigned 6
 };
 
 void time_utils_dump();

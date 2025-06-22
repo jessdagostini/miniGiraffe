@@ -156,7 +156,8 @@ def get_cpu_info(cpu_info):
 logger = configure_log("miniGiraffe.log")
 logger.info("***Starting miniGiraffe pipeline***")
 
-mG_files = ["miniGiraffe256", "miniGiraffe128", "miniGiraffe64", "miniGiraffe32", "miniGiraffe16", "perf-utils.so", "time-utils.so", "set-env.sh"]
+mG_files = ["miniGiraffe2048", "perf-utils.so", "time-utils.so", "set-env.sh"]
+# mG_files = ["miniGiraffeNC", "miniGiraffe256", "miniGiraffe128", "miniGiraffe64", "miniGiraffe32", "miniGiraffe16", "perf-utils.so", "time-utils.so", "set-env.sh"]
 # mG_files = ["miniGiraffeThread256", "miniGiraffeThread128", "miniGiraffeThread16", "miniGiraffeThread512" "perf-utils.so", "time-utils.so", "set-env.sh"]
 
 # Move to tmp to be a common folder
@@ -198,14 +199,15 @@ env_path['LD_LIBRARY_PATH'] = f"$LD_LIBRARY_PATH:{source_folder}/deps/gbwt/lib:{
 # logger.info('[Main] LD_LIBRARY_PATH')
 
 # Setup paths
+
 # binary_path = os.path.join(destination_folder, "miniGiraffe")
-# seed_path = os.path.join(destination_folder, "dump_proxy_novaseq.bin")
-# gbz_path = os.path.join(destination_folder, "1000GPlons_hs38d1_filter.giraffe.gbz")
-# seed_path = os.path.join(destination_folder, "dump_proxy_sampled_by_reads.bin")
+seed_path = os.path.join(destination_folder, "dump_proxy_novaseq.bin")
+gbz_path = os.path.join(destination_folder, "1000GPlons_hs38d1_filter.giraffe.gbz")
+# seed_path = os.path.join(destination_folder, "dump_proxy_sampled_by_pairs.bin")
 # gbz_path = os.path.join(destination_folder, "hprc-v1.1-mc-chm13.gbz")
-tmp_folder_destination = "/lscratch/jessicadagostini/chm13/"
-seed_path = os.path.join(tmp_folder_destination, "dump_proxy_d1s1l002.bin")
-gbz_path = os.path.join(tmp_folder_destination, "hprc-v1.1-mc-chm13.gbz")
+# tmp_folder_destination = "/lscratch/jessicadagostini/chm13/"
+# seed_path = os.path.join(tmp_folder_destination, "dump_proxy_d1s1l002.bin")
+# gbz_path = os.path.join(tmp_folder_destination, "hprc-v1.1-mc-chm13.gbz")
 
 # Run warmup test case
 # logger.info("[Main] Running warmup test case")
@@ -242,8 +244,8 @@ except Exception as e: # Catch any other unexpected error
 batch_size = [512]
 
 # cache_size = ["miniGiraffe256", "miniGiraffe128", "miniGiraffe64", "miniGiraffe32", "miniGiraffe16"]
-# cache_size = ["miniGiraffe256", "miniGiraffe64", "miniGiraffe16"]
-cache_size = ["miniGiraffe256"]
+# cache_size = ["miniGiraffeNC", "miniGiraffe256", "miniGiraffe64", "miniGiraffe16"]
+cache_size = ["miniGiraffe2048"]
 # cache_size = ["miniGiraffeThread256", "miniGiraffeThread128", "miniGiraffeThread16", "miniGiraffeThread512"]
 
 # scheduler = ['ws', 'omp']
@@ -263,7 +265,7 @@ scheduler = ['omp']
 # num_threads = [1]
 num_threads = [96, 72, 48, 24, 8, 4, 2, 1]
 
-repetitions = 1
+repetitions = 2
 
 # options = {
 #     'timing' :  [
@@ -281,7 +283,7 @@ repetitions = 1
 # }
 
 options = {
-    'timing_full_C' :  [
+    '1000GP' :  [
         '-p'
     ]
     
@@ -315,7 +317,7 @@ for cache in cache_size:
                         # Parse and save output
                         if output is not None:
                             # If the output is from a timing measurement, we need to do some parsing
-                            if 'timing' in opt:
+                            if '1000GP' in opt:
                                 data = pd.read_csv(tmp_stderr, delimiter=",", header=None)
                                 data[4] = data[2] - data[1]
                                 grouped  = data.groupby([0, 3]).sum().reset_index()

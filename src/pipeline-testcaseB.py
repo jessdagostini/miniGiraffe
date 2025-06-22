@@ -159,7 +159,7 @@ def get_cpu_info(cpu_info):
 logger = configure_log("miniGiraffeB.log")
 logger.info("***Starting miniGiraffe pipeline***")
 
-mG_files = ["miniGiraffeNC", "miniGiraffe256", "miniGiraffe64", "miniGiraffe16", "perf-utils.so", "time-utils.so", "set-env.sh"]
+mG_files = ["miniGiraffe256", "perf-utils.so", "time-utils.so", "set-env.sh"]
 # mG_files = ["miniGiraffeThread256", "miniGiraffeThread128", "miniGiraffeThread16", "miniGiraffeThread512" "perf-utils.so", "time-utils.so", "set-env.sh"]
 
 # Move to tmp to be a common folder
@@ -202,7 +202,7 @@ env_path['LD_LIBRARY_PATH'] = f"$LD_LIBRARY_PATH:{source_folder}/deps/gbwt/lib:{
 
 # Setup paths
 testcase_folder = "/lscratch/jessicadagostini/yeast/"
-seed_path = os.path.join(testcase_folder, "dump_proxy_yeast_all_16.bin")
+seed_path = os.path.join(testcase_folder, "dump_proxy_yeast_all_fourth.bin")
 gbz_path = os.path.join(testcase_folder, "yeast_all.giraffe.gbz")
 
 # Run warmup test case
@@ -236,10 +236,12 @@ except Exception as e: # Catch any other unexpected error
 
 # Define array of tests
 # batch_size = [256, 512, 1024, 2048, 4096]
-batch_size = [256, 512, 1024]
+# batch_size = [256, 512, 1024]
+batch_size = [512]
 
-cache_size = ["miniGiraffeNC", "miniGiraffe256", "miniGiraffe64", "miniGiraffe16"]
+# cache_size = ["miniGiraffeNC", "miniGiraffe256", "miniGiraffe64", "miniGiraffe16"]
 # cache_size = ["miniGiraffeThread256", "miniGiraffeThread128", "miniGiraffeThread16", "miniGiraffeThread512"]
+cache_size = ["miniGiraffe256"]
 
 # scheduler = ['ws', 'omp']
 scheduler = ['omp']
@@ -256,7 +258,7 @@ scheduler = ['omp']
 # num_threads.append(2)
 # num_threads = [16, 32]
 # num_threads = [1]
-num_threads = [64, 32, 16, 8, 4, 2, 1]
+num_threads = [96, 72, 48, 24, 8, 4, 2, 1]
 
 repetitions = 2
 
@@ -284,7 +286,7 @@ repetitions = 2
 # }
 
 options = {
-    'yeast' :  [
+    'yeast_fourth' :  [
         '-p'
     ]
     
@@ -318,7 +320,7 @@ for cache in cache_size:
                         # Parse and save output
                         if output is not None:
                             # If the output is from a timing measurement, we need to do some parsing
-                            if 'timing' in opt:
+                            if 'yeast' in opt:
                                 data = pd.read_csv(tmp_stderr, delimiter=",", header=None)
                                 data[4] = data[2] - data[1]
                                 grouped  = data.groupby([0, 3]).sum().reset_index()

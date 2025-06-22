@@ -30,7 +30,10 @@ time-utils.so: src/time-utils.cpp
 perf-utils.so: src/perf-utils.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@
 
-miniGiraffe: src/miniGiraffe.cpp time-utils.so perf-utils.so
+handle-utils.so: src/handle-utils.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@
+
+miniGiraffe: src/miniGiraffe.cpp time-utils.so perf-utils.so handle-utils.so
 	$(CXX) -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
 
 miniGiraffeMPI: src/miniGiraffeMPI.cpp time-utils.so perf-utils.so

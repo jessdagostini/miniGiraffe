@@ -397,6 +397,7 @@ bool process_next_state(const gbwt::BidirectionalState& next_state, GaplessExten
 
     // Check if we are going right or left
     if (direction == HandlePosition::Forward) { // Right
+        // printf("NodeAcc, %d\n", omp_get_thread_num());
         handle = gbwtgraph::GBWTGraph::node_to_handle(next_state.forward.node);
 
         node_offset = match_forward(next, sequence, graph->get_sequence_view(handle), mismatch_limit);
@@ -414,6 +415,7 @@ bool process_next_state(const gbwt::BidirectionalState& next_state, GaplessExten
         }
     } else { // Left
         // printf("Entrou left\n");
+        // printf("NodeAcc, %d\n", omp_get_thread_num());
         handle = gbwtgraph::GBWTGraph::node_to_handle(gbwt::Node::reverse(next_state.backward.node));
 
         // If we are going to left, need to change next.offse
@@ -913,8 +915,8 @@ int setup_counters(string optarg) {
             e.nameToIndex["L1-misses"] = PerfUtilsCounters::L1MISSES;
         
         } else if (token == "LLCACHE") {
-            e.registerCounter("LLC-access", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16));
-            e.registerCounter("LLC-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));
+            e.registerCounter("LLC-access", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16));
+            e.registerCounter("LLC-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));
             e.nameToIndex["LLC-access"] = PerfUtilsCounters::LLCACCESS;
             e.nameToIndex["LLC-misses"] = PerfUtilsCounters::LLCMISSES;
         

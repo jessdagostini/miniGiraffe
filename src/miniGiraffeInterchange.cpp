@@ -87,6 +87,11 @@ struct SeedSource {
     vector<int> seq_idx;
 };
 
+struct SeqOffset {
+    int64_t offset;
+    int seq_idx;
+};
+
 struct GaplessExtension {
     std::vector<gbwtgraph::handle_t>     path;
     size_t                    offset;
@@ -576,23 +581,25 @@ bool trim_mismatches(GaplessExtension& extension, const gbwtgraph::CachedGBWTGra
     return true;
 }
 
-void extend(vector<string>& sequences, vector<int> &seq_idx, seed_type& seed, const gbwtgraph::CachedGBWTGraph* graph, int element_index, ExtensionResultNew* full_result) {
-    for (int seq : seq_idx) {
-        string sequence = sequences[seq];
+void extend(vector<string>& sequences, vector<SeqOffset> &seq_idx, gbwtgraph::handle_t& seed, const gbwtgraph::CachedGBWTGraph* graph, int element_index, vector<vector<GaplessExtension>>& results, vector<size_t>& best_alignments, vector<int>& full_result) {
+    for (auto seq : seq_idx) {
+        string sequence = sequences[seq.seq_idx];
         if (sequence.empty()) {
             continue;
         }
-        vector<GaplessExtension> result;
-        result.reserve(1);
+        vector<GaplessExtension> result = results[seq.seq_idx];
+        // result.reserve(1);
 
-        size_t best_alignment = numeric_limits<size_t>::max(); // Metric to find the best extension from each seed        
+        size_t best_alignment = best_alignments[seq.seq_idx]; // Metric to find the best extension from each seed        
         
-        size_t node_offset = (seed.second < 0) ? -(seed.second) : 0;
-        size_t read_offset = (seed.second < 0) ? 0 : seed.second;
+        // size_t node_offset = (seed.second < 0) ? -(seed.second) : 0;
+        // size_t read_offset = (seed.second < 0) ? 0 : seed.second;
+        size_t node_offset = (seq.offset < 0) ? -(seq.offset) : 0;
+        size_t read_offset = (seq.offset < 0) ? 0 : seq.offset;
 
         // Check if the seed is contained in an exact full-length alignment.
         if (best_alignment < result.size() && result[best_alignment].internal_score == 0) {
-            if (result[best_alignment].contains(*graph, seed, node_offset, read_offset)) {
+            if (result[best_alignment].contains(*graph, pair(seed,seq.offset), node_offset, read_offset)) {
                 continue;
             }
         }
@@ -620,13 +627,13 @@ void extend(vector<string>& sequences, vector<int> &seq_idx, seed_type& seed, co
         // };
         
         GaplessExtension match {
-            { seed.first }, node_offset, graph->get_bd_state(seed.first),
+            { seed }, node_offset, graph->get_bd_state(seed),
             { read_offset, read_offset }, { },
             static_cast<int32_t>(0), false, false,
             false, false, static_cast<uint32_t>(0), static_cast<uint32_t>(0)
         };
         
-        size_t nd_of = match_forward(match, sequence, graph->get_sequence_view(seed.first), INFINITY_MISMATCHES);
+        size_t nd_of = match_forward(match, sequence, graph->get_sequence_view(seed), INFINITY_MISMATCHES);
         if (match.read_interval.first == 0) {
             match.left_full = true;
             match.left_maximal = true;
@@ -692,13 +699,16 @@ void extend(vector<string>& sequences, vector<int> &seq_idx, seed_type& seed, co
         if (!best_match.empty()) {
             if (best_match.full() && (best_alignment >= result.size() || best_match.internal_score < result[best_alignment].internal_score)) {
                 best_alignment = result.size();
+                best_alignments[seq.seq_idx] = best_alignment;
             }
-            result.emplace_back(move(best_match));
+            results[seq.seq_idx].emplace_back(move(best_match));
+
+            // cout << "Result size: " << result.size() << endl;
+            // cout << "Best alignment: " << best_alignment << endl;
+            // results[seq.seq_idx] = result;
         }
 
         // cout << "Element index: " << element_index << endl;
-        full_result[element_index].seq_idx = seq;
-        full_result[element_index].extensions = result;
     }
 
     // If we have a good enough full-length alignment, return the best sufficiently
@@ -729,7 +739,34 @@ void extend(vector<string>& sequences, vector<int> &seq_idx, seed_type& seed, co
     //     delete cache;
     //     cache = nullptr;
     // }
-} 
+}
+
+void prune(size_t best_alignment, vector<GaplessExtension>& result, const string& sequence, int seq_idx, const gbwtgraph::CachedGBWTGraph* graph, vector<int>& full_result) {
+    // If we have a good enough full-length alignment, return the best sufficiently
+    // distinct full-length alignments.
+    cout << "Sequence: " << sequence << endl;
+    size_t max_mismatches = 100;
+    if (best_alignment < result.size() && result[best_alignment].internal_score <= MAX_MISMATCHES) {
+        handle_full_length(*graph, result, OVERLAP_THRESHOLD);
+        find_mismatches(sequence, *graph, result);
+    }
+
+    // Otherwise remove duplicates, find mismatches, and trim the extensions to maximize
+    // score.
+    else {
+        remove_duplicates(result);
+        find_mismatches(sequence, *graph, result);
+        bool trimmed = false;
+        for (GaplessExtension& extension : result) {
+            trimmed |= trim_mismatches(extension, *graph);
+        }
+        if (trimmed) {
+            // cout << "After trimmed" << endl;
+            remove_duplicates(result);
+        }
+    }
+    full_result[seq_idx] += result.size();
+}
 
 void write_extensions(ExtensionResult* results, int size) {
     // Specify the file name
@@ -997,6 +1034,85 @@ int load_seeds(string filename, vector<string>&sequences, vector<SeedSource> &da
     return 0;
 }
 
+int load_seeds(string filename, vector<string>&sequences, vector<pair<gbwtgraph::handle_t, vector<SeqOffset>>> &data) {
+    // Open the file in binary mode for reading
+    ifstream file(filename, ios::binary);
+
+    if (!file.is_open()) {
+        cerr << "Error opening the file!" << endl;
+        return -1;
+    }
+
+    pair<gbwtgraph::handle_t, vector<SeqOffset>> tmpData;
+    SeqOffset tmp;
+    size_t seqs, sources, seq_idxs;
+    gbwtgraph::handle_t nidx;
+    char ch;
+
+    file.read(reinterpret_cast<char*>(&seqs), sizeof(seqs));
+    for (size_t i = 0; i < seqs; i++) {
+        string tmpSeq;
+        while (file.get(ch) && ch != '\0') {
+            tmpSeq += ch;
+        }
+
+        // cout << "Seq: " << tmpSeq << endl;
+
+        sequences.push_back(tmpSeq);
+
+        if (!file) {
+            if (file.eof()) {
+                // End of file reached
+                cerr << "End of file reached while reading sequences." << endl;
+                break;
+            } else {
+                cerr << "Error reading from the file." << endl;
+                return -1;
+            }
+        }
+    }
+    cout << "Done reading sequences" << endl;
+
+    file.read(reinterpret_cast<char*>(&sources), sizeof(sources));
+    for (size_t i = 0; i < sources; i++) {
+        // Save the seed id
+        file.read(reinterpret_cast<char*>(&nidx), sizeof(gbwtgraph::handle_t));
+        // cout << "Seed Id: " << nidx << endl;
+        tmpData.first = nidx;
+
+        // Read how many sequences refer to this seed
+        file.read(reinterpret_cast<char*>(&seq_idxs), sizeof(seq_idxs));
+
+        // cout << "Read how many sequences refer to this seed: " << seq_idxs << endl;
+        for (size_t j = 0; j < seq_idxs; j++) {
+            // Save the seq + seed data
+            file.read(reinterpret_cast<char*>(&tmp.offset), sizeof(int64_t));
+            file.read(reinterpret_cast<char*>(&tmp.seq_idx), sizeof(int));
+            tmpData.second.push_back(tmp);
+        }
+
+
+        data.push_back(tmpData);
+        tmpData = pair<gbwtgraph::handle_t, vector<SeqOffset>>();
+
+        // Check if reading was successful
+        if (!file) {
+            if (file.eof()) {
+                // End of file reached
+                cerr << "End of file reached while reading seeds." << endl;
+                break;
+            } else {
+                cerr << "Error reading from the file." << endl;
+                return -1;
+            }
+        }
+    }
+
+    // Close the file
+    file.close();
+    return 0;
+}
+
 double get_wall_time() {
     struct timespec time;
     clock_gettime(CLOCK_MONOTONIC, &time); // or CLOCK_REALTIME
@@ -1124,7 +1240,7 @@ void usage() {
 
 int main(int argc, char *argv[]) {
     vector<string> sequences;
-    vector<SeedSource> data;
+    vector<pair<gbwtgraph::handle_t, vector<SeqOffset>>> data;
     gbwtgraph::GBZ gbz;
     int num_threads = omp_get_max_threads();
     int batch_size = DEFAULT_PARALLEL_BATCHSIZE;
@@ -1233,7 +1349,8 @@ int main(int argc, char *argv[]) {
     }
 
     int size = data.size();
-    ExtensionResultNew* full_result = new ExtensionResultNew[size];
+    // ExtensionResultNew* full_result = new ExtensionResultNew[size];
+    vector<int> full_result(size, 0);
 
     cout << "Starting mapping with " << num_threads << " and batch size " << batch_size << " with " << scheduler << " scheduler and CachedGBWT Capacity " << gbwt::CachedGBWT::INITIAL_CAPACITY << endl;
     if (scheduler == "omp") {
@@ -1251,7 +1368,10 @@ int main(int argc, char *argv[]) {
             #pragma omp for schedule(dynamic, batch_size)
             for (int i = 0; i < size; i++) {
                 if (profile) start = omp_get_wtime();
-                extend(sequences, data[i].seq_idx, data[i].seed, cache, i, full_result);
+                
+                // gbwtgraph::handle_t seed = gbwtgraph::GBWTGraph::node_to_handle(data[i].first);
+                // extend(sequences, data[i].second, seed, cache, i, full_result);
+                
                 if (profile) {
                     double end = get_wall_time();
                     time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, omp_get_thread_num());
@@ -1260,7 +1380,7 @@ int main(int argc, char *argv[]) {
             // Clean up the thread-private cache variable
             delete cache;
         }
-    } else {
+    } else if (scheduler == "ws") {
         // Work-stealing scheduler
         thread* thread_array = new thread[num_threads];
         int chunk_size = (size + (num_threads - 1)) / num_threads;
@@ -1294,16 +1414,70 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < num_threads; i++) {
             thread_array[i].join();
         }
+    } else {
+        double start, end; // Local to each thread
+        vector<vector<GaplessExtension>> results(sequences.size());
+        // for (int i = 0; i < sequences.size(); i++) {
+        //     results[i].reserve(sequences.size());
+        // }
+        vector<size_t> best_alignment(sequences.size(), numeric_limits<size_t>::max());
+
+        // Loop over seeds
+        for (int i = 0; i < size; i++) {
+            if (profile) start = omp_get_wtime();
+            gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
+            
+            // gbwtgraph::handle_t seed = gbwtgraph::GBWTGraph::node_to_handle(data[i].first);
+            extend(sequences, data[i].second, data[i].first, cache, i, results, best_alignment, full_result);
+            
+            if (profile) {
+                double end = get_wall_time();
+                time_utils_add(start, end, TimeUtilsRegions::SEEDS_LOOP, omp_get_thread_num());
+            }
+            delete cache;
+        }
+
+        // For now, we just want to make sure we have the same number of extensions when running with single and distributed
+        // int local_size = 0;
+        // #pragma omp parallel for reduction(+:local_size)
+        // for (int i = 0; i < size; i++) {
+        //     local_size += full_result[i];
+        // }
+        // cout << "Found " << local_size << " extensions" << endl;
+        cout << "Move to prune" << endl;
+        vector<int> full_prune = vector(sequences.size(), 0);
+        
+        for (int i=0; i<sequences.size(); i++) {
+            if (profile) start = omp_get_wtime();
+            gbwtgraph::CachedGBWTGraph* cache = new gbwtgraph::CachedGBWTGraph(*(graph));
+            prune(best_alignment[i], results[i], sequences[i], i, cache, full_prune);
+            if (profile) {
+                double end = get_wall_time();
+                time_utils_add(start, end, TimeUtilsRegions::TRIM_EXTENSIONS, omp_get_thread_num());
+            }
+            delete cache;
+        }
+
+        // For now, we just want to make sure we have the same number of extensions when running with single and distributed
+        int local_size = 0;
+        #pragma omp parallel for reduction(+:local_size)
+        for (int i = 0; i < sequences.size(); i++) {
+            local_size += full_prune[i];
+        }
+        cout << "Found " << local_size << " extensions" << endl;
+        // Clean up the thread-private cache variable
+        // delete cache;
     }
 
     cout << "Finished mapping" << endl;
     cout << "Writing extensions" << endl;
-    if (profile) start = get_wall_time();
-    write_extensions(full_result, &sequences, size);
-    if (profile) {
-        double end = get_wall_time();
-        time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, omp_get_thread_num());
-    }
+
+    // if (profile) start = get_wall_time();
+    // write_extensions(full_result, &sequences, size);
+    // if (profile) {
+    //     double end = get_wall_time();
+    //     time_utils_add(start, end, TimeUtilsRegions::WRITING_OUTPUT, omp_get_thread_num());
+    // }
 
     if (profile) time_utils_dump();
     if (hw_counters) perf_utils_dump();

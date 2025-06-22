@@ -4,6 +4,8 @@
 // #include <gbwtgraph/cached_gbwtgraph.h>
 #include <queue>
 #include <unordered_map>
+#include <random>
+#include <algorithm>
 
 #ifdef USE_UNORDERED_SET
 #include <unordered_set>
@@ -151,7 +153,15 @@ int main(int argc, char *argv[]) {
 
     load_seeds(filename_dump, dump);
 
-    size_t new_size = dump.size() * 10 / 100; // Reduce to 10% of the original size
+    size_t new_size = dump.size() * 10 / 100; // Reduce to 5% of the original size
+
+    // Shuffle and select 10% random reads
+    random_device rd;
+    mt19937 g(rd());
+    shuffle(dump.begin(), dump.end(), g);
+
+    // Take only the first new_size elements after shuffling
+    vector<Source> selected_reads(dump.begin(), dump.begin() + new_size);
 
     cout << "Dump size: " << dump.size() << endl;
     cout << "New size: " << new_size << endl;
@@ -159,7 +169,7 @@ int main(int argc, char *argv[]) {
     string filename_new_dump = argv[2];
     cout << "New dump filename: " << filename_new_dump << endl;
 
-    write_seeds(filename_new_dump, dump, new_size);
+    write_seeds(filename_new_dump, selected_reads, new_size);
 
     return 0;
 }

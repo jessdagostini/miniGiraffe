@@ -203,11 +203,11 @@ class MiniGiraffePipeline:
             last_dot_index = sequence_path.rindex('.')
             base_name = sequence_path[:last_dot_index]
             extension = sequence_path[last_dot_index:] # Includes the dot
-            destination_sequence_path = base_name + "10p" + extension
+            destination_sequence_path = base_name + "10p_random" + extension
         except ValueError: # No dot found, so no extension
             base_name = sequence_path
             extension = ""
-            destination_sequence_path = base_name + "10p" + extension
+            destination_sequence_path = base_name + "10p_random" + extension
 
         if os.path.exists(destination_sequence_path):
             self.logger.warning(f"[Lower Sequence Input] File already exists: {destination_sequence_path}")

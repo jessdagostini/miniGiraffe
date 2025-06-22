@@ -47,8 +47,11 @@ void load_data(string filename, vector<GaplessExtension> &data){
             sequence += ch;
         }
 
+        cout << sequence << endl;
+
         // cout << sequence << endl;
         file.read(reinterpret_cast<char*>(&extensions), sizeof(extensions));
+        cout << "Extensions " << extensions << endl;
 
         for(size_t i=0; i < extensions; i++) {
             e.sequence = sequence; 
@@ -144,7 +147,7 @@ int main(int argc, char *argv[]) {
     load_data(giraffe_dump, giraffe_data);
     load_data(proxy_dump, proxy_data);
 
-    cout << "Giraffe" << endl;
+    cout << "miniGiraffe original" << endl;
     cout << giraffe_data.size() << endl;
     for(auto gd: giraffe_data) {
         // cout << "Sequence: " << gd.sequence << endl;
@@ -171,7 +174,7 @@ int main(int argc, char *argv[]) {
     //     cout << endl;
     // }
 
-    cout << "Proxy" << endl;
+    cout << "Interchange" << endl;
     cout << proxy_data.size() << endl;
     bool found = false;
     int teste = 0;

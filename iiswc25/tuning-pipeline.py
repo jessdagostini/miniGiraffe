@@ -79,7 +79,7 @@ cache_size = [256, 512, 1024, 2048, 4096]
 
 scheduler = ['omp', 'ws']
 
-num_threads = [total_threads, total_cpu]
+num_threads = [total_threads]
 
 options = {
     'tuning' :  [
@@ -136,9 +136,10 @@ for exp in pipeline.full_fact_design:
                     print(f"Error reading {csv_file}: {e}")
                 continue
 
-            binary_path = os.path.join(pipeline.destination_folder, mG_files[0])
+            binary_path = os.path.join(pipeline.destination_folder, mG_files[1])
             
-            output = pipeline.run_binary(binary_path, [sequence_path_lowered, gbz_path, f'-b{batch}', f'-t{threads}', f'-s{sched}', f'-c{cache}'] + options[opt],  env_path)
+            # output = pipeline.run_binary(binary_path, [sequence_path_lowered, gbz_path, f'-b{batch}', f'-t{threads}', f'-s{sched}', f'-c{cache}'] + options[opt],  env_path)
+            output = pipeline.run_binary(binary_path, [sequence_path, gbz_path, f'-b{batch}', f'-t{threads}', f'-s{sched}', f'-c{cache}'] + options[opt],  env_path)
 
             # Parse and save output
             if output is not None:
@@ -161,48 +162,48 @@ for exp in pipeline.full_fact_design:
 pipeline.logger.info("[Main] All tests completed successfully.")
 
 # Aggregate results and find the best configuration
-pipeline.logger.info("[Main] Aggregating results and finding the best configuration")
+# pipeline.logger.info("[Main] Aggregating results and finding the best configuration")
 
-# Transform the makespan dictionary into a DataFrame
-makespan_df = pd.DataFrame(makespan)
-pipeline.logger.debug(f"[Main] Makespan DataFrame created successfully: {makespan_df}")
+# # Transform the makespan dictionary into a DataFrame
+# makespan_df = pd.DataFrame(makespan)
+# pipeline.logger.debug(f"[Main] Makespan DataFrame created successfully: {makespan_df}")
 
-# Find the best configuration based on the maximum runtime for each grouping
-grouping_columns = ['batch_size', 'num_threads', 'scheduler', 'cache_size']
-max_runtime_df_indexed = makespan_df.groupby(grouping_columns)['runtime'].max().reset_index(name='makespan')
-# filtered_by_q1 = max_runtime_df_indexed[max_runtime_df_indexed['query'] == "seeds-loop"]
-filtered_by_q1 = max_runtime_df_indexed[max_runtime_df_indexed['makespan'].min() == max_runtime_df_indexed['makespan']]
-pipeline.logger.info(f"[Main] Best configuration found: {filtered_by_q1}")
-batch, threads, scheduler, cache, runtime = filtered_by_q1.values.tolist()[0]
+# # Find the best configuration based on the maximum runtime for each grouping
+# grouping_columns = ['batch_size', 'num_threads', 'scheduler', 'cache_size']
+# max_runtime_df_indexed = makespan_df.groupby(grouping_columns)['runtime'].max().reset_index(name='makespan')
+# # filtered_by_q1 = max_runtime_df_indexed[max_runtime_df_indexed['query'] == "seeds-loop"]
+# filtered_by_q1 = max_runtime_df_indexed[max_runtime_df_indexed['makespan'].min() == max_runtime_df_indexed['makespan']]
+# pipeline.logger.info(f"[Main] Best configuration found: {filtered_by_q1}")
+# batch, threads, scheduler, cache, runtime = filtered_by_q1.values.tolist()[0]
 
-# Log the best configuration
-pipeline.logger.info(f"[Main] Best configuration found: Batch Size: {batch}, Threads: {threads}, Scheduler: {scheduler}, Cache Size: {cache}, Runtime: {runtime}")
+# # Log the best configuration
+# pipeline.logger.info(f"[Main] Best configuration found: Batch Size: {batch}, Threads: {threads}, Scheduler: {scheduler}, Cache Size: {cache}, Runtime: {runtime}")
 
-# Run the best configuration with the original sequence input
-pipeline.logger.info("[Main] Running the best configuration with the original sequence input")
-output_csv = f"{batch}_{threads}_{scheduler}_{0}_full_{cache}.csv"
-binary_path = os.path.join(pipeline.destination_folder, mG_files[0])
-output = pipeline.run_binary(binary_path, [sequence_path, gbz_path, f'-b{batch}', f'-t{threads}', f'-s{scheduler}', f'-c{cache}'] + options['tuning'], env_path)
-if output is not None:
-    data = pd.read_csv(pipeline.tmp_stderr, delimiter=",", header=None)
-    data[4] = data[2] - data[1]
-    grouped  = data.groupby([0, 3]).sum().reset_index()
-    grouped[[0, 4, 3]].to_csv(output_csv, index=False)
-else:
-    pipeline.logger.error("[Main] Error running the best configuration test")
-    exit(-1)
+# # Run the best configuration with the original sequence input
+# pipeline.logger.info("[Main] Running the best configuration with the original sequence input")
+# output_csv = f"{batch}_{threads}_{scheduler}_{0}_full_{cache}.csv"
+# binary_path = os.path.join(pipeline.destination_folder, mG_files[1])
+# output = pipeline.run_binary(binary_path, [sequence_path, gbz_path, f'-b{batch}', f'-t{threads}', f'-s{scheduler}', f'-c{cache}'] + options['tuning'], env_path)
+# if output is not None:
+#     data = pd.read_csv(pipeline.tmp_stderr, delimiter=",", header=None)
+#     data[4] = data[2] - data[1]
+#     grouped  = data.groupby([0, 3]).sum().reset_index()
+#     grouped[[0, 4, 3]].to_csv(output_csv, index=False)
+# else:
+#     pipeline.logger.error("[Main] Error running the best configuration test")
+#     exit(-1)
 
-# Run the default configuration with the original sequence input
-pipeline.logger.info("[Main] Running the default configuration with the original sequence input")
-output_csv = f"256_{threads}_omp_0_full_256.csv"
-output = pipeline.run_binary(binary_path, [sequence_path, gbz_path, f'-t{threads}'] + options['tuning'], env_path)
-if output is not None:
-    data = pd.read_csv(pipeline.tmp_stderr, delimiter=",", header=None)
-    data[4] = data[2] - data[1]
-    grouped  = data.groupby([0, 3]).sum().reset_index()
-    grouped[[0, 4, 3]].to_csv(output_csv, index=False)
-else:
-    pipeline.logger.error("[Main] Error running the default configuration test")
-    exit(-1)
+# # Run the default configuration with the original sequence input
+# pipeline.logger.info("[Main] Running the default configuration with the original sequence input")
+# output_csv = f"512_{threads}_omp_0_full_256.csv"
+# output = pipeline.run_binary(binary_path, [sequence_path, gbz_path, f'-t{threads}'] + options['tuning'], env_path)
+# if output is not None:
+#     data = pd.read_csv(pipeline.tmp_stderr, delimiter=",", header=None)
+#     data[4] = data[2] - data[1]
+#     grouped  = data.groupby([0, 3]).sum().reset_index()
+#     grouped[[0, 4, 3]].to_csv(output_csv, index=False)
+# else:
+#     pipeline.logger.error("[Main] Error running the default configuration test")
+#     exit(-1)
 
 pipeline.logger.info("[Main] miniGiraffe tuning pipeline completed successfully")

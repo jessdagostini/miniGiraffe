@@ -124,22 +124,20 @@
   ~ispass13-test-all-times.csv.gz~ ~ispass13-Giraffe-all-times.csv.gz~ from HD
 * Experiments
 - [ ] #1 Validate hw metrics between miniGiraffe vs Giraffe on
-  Kaffirlime, sequential execution, 1000GP and yeast
-- [ ] #2 Validate runtime between miniGiraffe vs Giraffe on
-  Kaffirlime, sequential execution, 1000GP and yeast
-- [ ] #3 Validate the output between miniGiraffe vs Giraffe, 1000GP
+  Kaffirlime, sequential execution, 1000GP
+- [ ] #2 Validate the output between miniGiraffe vs Giraffe, 1000GP
   and yeast
-- [ ] #4 Validate parallel scalability on Kaffirlime, 1000GP and yeast
-- [ ] #5 Workload analysis of miniGiraffe over Intel, AMD, and ARM
+- [ ] #3 Validate parallel scalability on Kaffirlime, 1000GP and yeast
+- [-] #5 Workload analysis of miniGiraffe over Intel, AMD, and ARM
   architectures
-  - [ ] #5.1 Collect scalability on Kaffirlime (Intel)
-  - [ ] #5.2 Collect scalability on Tangerine (AMD)
+  - [X] #5.1 Collect scalability on Kaffirlime (Intel)
+  - [X] #5.2 Collect scalability on Tangerine (AMD)
   - [ ] #5.3 Collect scalability on Chameleon (ARM)
-  - [ ] #5.4 Collect hw metrics on Tangerine (Sequential, one input
+  - [X] #5.4 Collect hw metrics on Tangerine (Sequential, one input
     set)
   - [ ] #5.5 Collect hw metrics on Chameleon (Sequential, one input
     set)
-  - [ ] #5.6 Collect hw metrics on Tangerine, parallel, using perf
+  - [X] #5.6 Collect hw metrics on Tangerine, parallel, using perf
 - [X] #6 Impact of CacheGBWT on the application
   - [X] #6.1 Collect runtime of running miniGiraffe with maximum
     number of threads without the CachedGBWT on Kaffirlime, all test cases
@@ -314,6 +312,817 @@ df.5.2.speedup %>%
 #+end_src
 * 1 - Validate hw metrics between miniGiraffe and Giraffe on kaffirlime
 We will use this data to understand scalability as well
+** miniGiraffe
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             skip = 6,
+             progress=FALSE,
+             col_names=FALSE,
+             col_types=cols()) %>%
+        rename(Counter = X1, Total = X2, Thread = X3)
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="miniGiraffe",
+                                 recursive=FALSE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 9 × 1
+  SOURCE                                                                                             
+  <chr>                                                                                              
+1 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_1_ipc_miniGiraffe.csv
+2 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_1_l1_miniGiraffe.csv 
+3 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_1_llc_miniGiraffe.csv
+4 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_2_ipc_miniGiraffe.csv
+5 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_2_l1_miniGiraffe.csv 
+6 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_2_llc_miniGiraffe.csv
+7 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_3_ipc_miniGiraffe.csv
+8 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_3_l1_miniGiraffe.csv 
+9 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_3_llc_miniGiraffe.csv
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "EXP"), sep="/") %>%
+    separate(EXP, c("Threads", "Repetition", "XX7", "Source"), sep="_") %>%
+    mutate(Source = str_replace_all(Source, "(.csv)", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    print() -> df.hw.mini
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 18 × 6
+   Threads Repetition Source      Counter              Total Thread
+   <chr>   <chr>      <chr>       <chr>                <dbl>  <dbl>
+ 1 1       1          miniGiraffe instructions 1489659364650      0
+ 2 1       1          miniGiraffe cycles        779157454795      0
+ 3 1       1          miniGiraffe L1-access     418819439122      0
+ 4 1       1          miniGiraffe L1-misses       1730374863      0
+ 5 1       1          miniGiraffe LLC-access       286368977      0
+ 6 1       1          miniGiraffe LLC-misses       208933546      0
+ 7 1       2          miniGiraffe instructions 1489196827585      0
+ 8 1       2          miniGiraffe cycles        778193653873      0
+ 9 1       2          miniGiraffe L1-access     418838358314      0
+10 1       2          miniGiraffe L1-misses       1680533430      0
+11 1       2          miniGiraffe LLC-access       288797264      0
+12 1       2          miniGiraffe LLC-misses       212049409      0
+13 1       3          miniGiraffe instructions 1489413195470      0
+14 1       3          miniGiraffe cycles        778774357632      0
+15 1       3          miniGiraffe L1-access     418836834870      0
+16 1       3          miniGiraffe L1-misses       1659617350      0
+17 1       3          miniGiraffe LLC-access       287808206      0
+18 1       3          miniGiraffe LLC-misses       212325636      0
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.hw.mini %>%
+  group_by(Counter) %>%
+  summarize(Result = mean(Total))
+#+end_src
+
+#+RESULTS:
+: # A tibble: 6 × 2
+:   Counter       Result
+:   <chr>          <dbl>
+: 1 L1-access    4.19e11
+: 2 L1-misses    1.69e 9
+: 3 LLC-access   2.88e 8
+: 4 LLC-misses   2.11e 8
+: 5 cycles       7.79e11
+: 6 instructions 1.49e12
+
+#+begin_src R :results output :session *R* :exports both
+1.49e12 / 7.79e11
+1.69e9 / 4.19e11
+2.11e8 / 2.88e8
+#+end_src
+
+#+RESULTS:
+: [1] 1.912709
+: [1] 0.004033413
+: [1] 0.7326389
+
+** Giraffe
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             progress=FALSE,
+             col_names=FALSE,
+             col_types=cols()) %>%
+        rename(Counter = X1, Total = X2, Thread = X3)
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="giraffe_parsed",
+                                 recursive=FALSE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 9 × 1
+  SOURCE                                                                                                
+  <chr>                                                                                                 
+1 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_1_ipc_giraffe_parsed.csv
+2 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_1_l1_giraffe_parsed.csv 
+3 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_1_ll_giraffe_parsed.csv 
+4 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_2_ipc_giraffe_parsed.csv
+5 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_2_l1_giraffe_parsed.csv 
+6 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_2_ll_giraffe_parsed.csv 
+7 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_3_ipc_giraffe_parsed.csv
+8 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_3_l1_giraffe_parsed.csv 
+9 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_3_ll_giraffe_parsed.csv
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "EXP"), sep="/") %>%
+    separate(EXP, c("Threads", "Repetition", "XX7", "Source", "XX8"), sep="_") %>%
+    #mutate(Source = str_replace_all(Source, "(.csv)", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    print() -> df.hw.gir
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 222,702,612 × 6
+   Threads Repetition Source  Counter       Total Thread
+   <chr>   <chr>      <chr>   <chr>         <dbl>  <dbl>
+ 1 1       1          giraffe cycles       175174      0
+ 2 1       1          giraffe instructions 204237      0
+ 3 1       1          giraffe cycles        34071      0
+ 4 1       1          giraffe instructions  30284      0
+ 5 1       1          giraffe cycles       117272      0
+ 6 1       1          giraffe instructions 183397      0
+ 7 1       1          giraffe cycles        98269      0
+ 8 1       1          giraffe instructions 175806      0
+ 9 1       1          giraffe cycles        47323      0
+10 1       1          giraffe instructions  53715      0
+# ℹ 222,702,602 more rows
+# ℹ Use `print(n = ...)` to see more rows
+Warning message:
+There were 3 warnings in `mutate()`.
+The first warning was:
+ℹ In argument: `DATA = map(SOURCE, read_traces)`.
+Caused by warning:
+! One or more parsing issues, call `problems()` on your data frame for details, e.g.:
+  dat <- vroom(...)
+  problems(dat)
+ℹ Run `dplyr::last_dplyr_warnings()` to see the 2 remaining warnings.
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.hw.gir %>%
+  group_by(Repetition, Counter) %>%
+  summarize(TotalSum = sum(Total)) %>%
+  print() -> df.hw.gir.tot
+#+end_src
+
+#+RESULTS:
+#+begin_example
+`summarise()` has grouped output by 'Repetition'. You can override using the `.groups` argument.
+# A tibble: 24 × 3
+# Groups:   Repetition [3]
+   Repetition Counter                                                                                               TotalSum
+   <chr>      <chr>                                                                                                    <dbl>
+ 1 1          L1-access                                                                                              3.87e11
+ 2 1          L1-misses                                                                                              4.55e 9
+ 3 1          LL-access                                                                                              3.79e 8
+ 4 1          LL-misses                                                                                              2.10e 8
+ 5 1          Mapping slowness: 3.95678 M instructions per read at 2469.94 M mapping instructions per inclusive CP… NA      
+ 6 1          Used 3956781932928 CPU instructions (not including output).                                           NA      
+ 7 1          cycles                                                                                                 7.84e11
+ 8 1          instructions                                                                                           1.33e12
+ 9 2          L1-access                                                                                              3.87e11
+10 2          L1-misses                                                                                              4.52e 9
+# ℹ 14 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.hw.gir.tot %>%
+  filter(!is.na(TotalSum)) %>%
+  ungroup() %>%
+  group_by(Counter) %>%
+  summarize(Mean = mean(TotalSum))
+#+end_src
+
+#+RESULTS:
+: # A tibble: 6 × 2
+:   Counter         Mean
+:   <chr>          <dbl>
+: 1 L1-access    3.87e11
+: 2 L1-misses    4.54e 9
+: 3 LL-access    3.83e 8
+: 4 LL-misses    2.12e 8
+: 5 cycles       7.95e11
+: 6 instructions 1.33e12
+
+#+begin_src R :results output :session *R* :exports both
+1.33e12 / 7.95e11
+#(Number of Cache Hits) / (Number of Cache Hits + Number of Cache Misses) * 100% 
+4.54e9 / 3.87e11
+2.12e8 / 3.83e8 
+#+end_src
+
+#+RESULTS:
+: [1] 1.672956
+: [1] 0.01173127
+: [1] 0.5535248
+
+
+** Giraffe
+#+begin_src R :results output :session *R* :exports both
+df <- read_csv("./iiswc25/intelxeonplatinum8260cpu@240ghz/1/1_0_vg_cache_ipc_giraffe.csv",
+               col_names=FALSE,
+               col_types=cols()) %>%
+  print()
+#+end_src
+
+#+RESULTS:
+#+begin_example
+indexing 1_0_vg_cache_ipc_giraffe.csv [=--------------------------------------------------------------] 265.44GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [==============-------------------------------------------------] 848.09MB/s, eta:  1sindexing 1_0_vg_cache_ipc_giraffe.csv [=================----------------------------------------------] 976.72MB/s, eta:  1sindexing 1_0_vg_cache_ipc_giraffe.csv [=====================--------------------------------------------] 1.10GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [=========================----------------------------------------] 1.24GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [=============================------------------------------------] 1.36GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [================================---------------------------------] 1.45GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [===================================------------------------------] 1.52GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [=======================================--------------------------] 1.61GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [==========================================-----------------------] 1.68GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [===============================================------------------] 1.79GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [=================================================----------------] 1.83GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [=====================================================------------] 1.89GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [=======================================================----------] 1.92GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [===========================================================------] 1.96GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [=============================================================----] 1.99GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [===============================================================--] 1.93GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [===============================================================--] 1.89GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [===============================================================--] 1.84GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [================================================================-] 1.82GB/s, eta:  0sindexing 1_0_vg_cache_ipc_giraffe.csv [=================================================================] 1.82GB/s, eta:  0s                                                                                                                            # A tibble: 24,744,736 × 3
+   X1               X2    X3
+   <chr>         <dbl> <dbl>
+ 1 cycles       349625     0
+ 2 instructions 305622     0
+ 3 cycles        31925     0
+ 4 instructions  30718     0
+ 5 cycles       134748     0
+ 6 instructions 194132     0
+ 7 cycles       107164     0
+ 8 instructions 182294     0
+ 9 cycles        46681     0
+10 instructions  57136     0
+# ℹ 24,744,726 more rows
+# ℹ Use `print(n = ...)` to see more rows
+Warning message:
+One or more parsing issues, call `problems()` on your data frame for details, e.g.:
+  dat <- vroom(...)
+  problems(dat)
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+  group_by(X1) %>%
+  summarize(Total = sum(X2))
+#+end_src
+
+#+RESULTS:
+: # A tibble: 4 × 2
+:   X1                                                                                                                   Total
+:   <chr>                                                                                                                <dbl>
+: 1 Mapping slowness: 4.30638 M instructions per read at 2769.42 M mapping instructions per inclusive CPU-second            NA
+: 2 Used 4306384243517 CPU instructions (not including output).                                                             NA
+: 3 cycles                                                                                                        902552009713
+: 4 instructions                                                                                                 1333599330390
+
+
+#+begin_example
+instructions, 1375523537087.3535156250, 0
+cycles, 705191815715.5950927734, 0
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+1333599330390 * 100 / 1375523537087
+#+end_src
+
+#+RESULTS:
+: [1] 96.95213
+
+#+begin_src R :results output :session *R* :exports both
+1375523537087 / 705191815715 # Proxy
+1333599330390 / 902552009713 # Giraffe
+#+end_src
+
+#+RESULTS:
+: [1] 1.950567
+: [1] 1.477587
+
+* 3 - Validate scalability between miniGiraffe and Giraffe on kaffirlime
+** Using kaffirlime and old data
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             progress=FALSE,
+             col_names=TRUE,
+             col_types=cols())
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="scalability_local-intel",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+: # A tibble: 1 × 1
+:   SOURCE                                                               
+:   <chr>                                                                
+: 1 /soe/jessicadagostini/miniGiraffe/iiswc25/scalability_local-intel.csv
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "EXP"), sep="/") %>%
+    separate(EXP, c("XX6", "Machine"), sep="-") %>%
+    mutate(Machine = str_replace_all(Machine, "([.csv])", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    print() -> df.mini
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 64 × 8
+   Machine Threads Scheduler CacheSize InputSet AvgMakespan Baseline Speedup
+   <chr>     <dbl> <chr>         <dbl> <chr>          <dbl>    <dbl>   <dbl>
+ 1 intel         1 omp             256 1000GP         186.      186.    1   
+ 2 intel         1 omp             256 chm13        27045.    27045.    1   
+ 3 intel         1 omp             256 grch38        2741.     2741.    1   
+ 4 intel         1 omp             256 yeast         4302.     4302.    1   
+ 5 intel         1 ws              256 1000GP         187.      187.    1   
+ 6 intel         1 ws              256 chm13        27395.    27395.    1   
+ 7 intel         1 ws              256 grch38        2767.     2767.    1   
+ 8 intel         1 ws              256 yeast         4322.     4322.    1   
+ 9 intel         2 omp             256 1000GP          95.5     186.    1.95
+10 intel         2 omp             256 chm13        13687.    27045.    1.98
+# ℹ 54 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.gir <- read_csv("./ispass-paper/ispass7-all-times.csv.gz",
+               col_names=TRUE,
+               progress=FALSE,
+               col_types=cols()) %>%
+    print()
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 2,148 × 6
+   TestCase Repetition TotalThreads Query           Thread Total
+   <chr>         <dbl>        <dbl> <chr>            <dbl> <dbl>
+ 1 A                 1            1 total_extension      0 171. 
+ 2 A                 1            1 total_main           0 686. 
+ 3 A                 1           16 total_extension      0  11.2
+ 4 A                 1           16 total_extension      1  12.0
+ 5 A                 1           16 total_extension      2  11.8
+ 6 A                 1           16 total_extension      3  11.7
+ 7 A                 1           16 total_extension      4  12.0
+ 8 A                 1           16 total_extension      5  11.6
+ 9 A                 1           16 total_extension      6  11.8
+10 A                 1           16 total_extension      7  11.9
+# ℹ 2,138 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.mini %>%
+  filter(Scheduler == "omp") %>%
+  mutate(TestCase = case_when(InputSet == "1000GP" ~ "A",
+                              InputSet == "chm13" ~ "C",
+                              InputSet == "grch38" ~ "D",
+                              InputSet == "yeast" ~ "B")) %>%
+  rename(Makespan = AvgMakespan) %>%
+  select(TestCase, Threads, Makespan, Baseline, Speedup) %>%
+  mutate(Origin = "miniGiraffe") %>%
+  print() -> df.mini
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 32 × 6
+   TestCase Threads Makespan Baseline Speedup Origin     
+   <chr>      <dbl>    <dbl>    <dbl>   <dbl> <chr>      
+ 1 A              1    186.      186.    1    miniGiraffe
+ 2 C              1  27045.    27045.    1    miniGiraffe
+ 3 D              1   2741.     2741.    1    miniGiraffe
+ 4 B              1   4302.     4302.    1    miniGiraffe
+ 5 A              2     95.5     186.    1.95 miniGiraffe
+ 6 C              2  13687.    27045.    1.98 miniGiraffe
+ 7 D              2   1395.     2741.    1.96 miniGiraffe
+ 8 B              2   2209.     4302.    1.95 miniGiraffe
+ 9 A              4     50.1     186.    3.71 miniGiraffe
+10 C              4   7264.    27045.    3.72 miniGiraffe
+# ℹ 22 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.gir %>%
+  filter(Query == "total_extension") %>%
+  rename(Threads = TotalThreads) %>%
+  group_by(TestCase, Threads) %>%
+  summarize(Makespan = max(Total)) %>%
+  ungroup() %>%
+  group_by(TestCase) %>%
+  mutate(Baseline = first(Makespan),
+         Speedup = Baseline/Makespan,
+         Origin = "Giraffe") %>%
+  print() -> df.gir
+#+end_src
+
+#+RESULTS:
+#+begin_example
+`summarise()` has grouped output by 'TestCase'. You can override using the `.groups` argument.
+# A tibble: 36 × 6
+# Groups:   TestCase [4]
+   TestCase Threads Makespan Baseline Speedup Origin 
+   <chr>      <dbl>    <dbl>    <dbl>   <dbl> <chr>  
+ 1 A              1   171.       171.    1    Giraffe
+ 2 A              2    88.1      171.    1.94 Giraffe
+ 3 A              4    45.8      171.    3.73 Giraffe
+ 4 A              8    24.1      171.    7.08 Giraffe
+ 5 A             16    12.4      171.   13.8  Giraffe
+ 6 A             24     8.59     171.   19.9  Giraffe
+ 7 A             32     7.26     171.   23.5  Giraffe
+ 8 A             35     6.87     171.   24.9  Giraffe
+ 9 A             48     6.65     171.   25.6  Giraffe
+10 B              1  4068.      4068.    1    Giraffe
+# ℹ 26 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.mini %>%
+  bind_rows(df.gir) %>%
+  print() -> df.3
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 68 × 6
+   TestCase Threads Makespan Baseline Speedup Origin     
+   <chr>      <dbl>    <dbl>    <dbl>   <dbl> <chr>      
+ 1 A              1    186.      186.    1    miniGiraffe
+ 2 C              1  27045.    27045.    1    miniGiraffe
+ 3 D              1   2741.     2741.    1    miniGiraffe
+ 4 B              1   4302.     4302.    1    miniGiraffe
+ 5 A              2     95.5     186.    1.95 miniGiraffe
+ 6 C              2  13687.    27045.    1.98 miniGiraffe
+ 7 D              2   1395.     2741.    1.96 miniGiraffe
+ 8 B              2   2209.     4302.    1.95 miniGiraffe
+ 9 A              4     50.1     186.    3.71 miniGiraffe
+10 C              4   7264.    27045.    3.72 miniGiraffe
+# ℹ 58 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.3 %>%
+  filter(Threads == 1) %>%
+  arrange(TestCase)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 6
+  TestCase Threads Makespan Baseline Speedup Origin     
+  <chr>      <dbl>    <dbl>    <dbl>   <dbl> <chr>      
+1 A              1     186.     186.       1 miniGiraffe
+2 A              1     171.     171.       1 Giraffe    
+3 B              1    4302.    4302.       1 miniGiraffe
+4 B              1    4068.    4068.       1 Giraffe    
+5 C              1   27045.   27045.       1 miniGiraffe
+6 C              1   24989.   24989.       1 Giraffe    
+7 D              1    2741.    2741.       1 miniGiraffe
+8 D              1    2561.    2561.       1 Giraffe
+#+end_example
+
+Bar plot
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1000 :height 600 :session *R*
+df.3 %>%
+  filter(Threads %in% c(1, 2, 4, 8, 24, 48)) %>%
+  mutate(Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=Origin)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_wrap(~TestCase, scales="free") +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(angle = 45, hjust = 1, size=15),
+        axis.text.x = element_text(angle = 45, hjust = 1, size=15))
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figuremEGwN3.png]]
+
+Line plot
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1000 :height 600 :session *R*
+df.3 %>%
+  filter(Threads %in% c(1, 2, 4, 5, 24, 48)) %>%
+  ggplot(aes(x=Threads, y=Speedup, color=Origin)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous("Threads", breaks=df.3$Threads) +
+  facet_wrap(~TestCase, scales="free_x") +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(angle = 45, hjust = 1, size=15),
+        axis.text.x = element_text(angle = 45, hjust = 1, size=15))
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figurecz2gJI.png]]
+
+#+begin_src R :results output :session *R* :exports both
+df.3 %>%
+  filter(Threads %in% c(1, 2, 4, 8, 16, 24, 48)) %>%
+  group_by(TestCase, Threads) %>%
+  arrange(TestCase, Makespan) %>%
+  mutate(Og = first(Makespan),
+         Diff = 100 * Makespan / first(Makespan)) %>%
+  filter(Origin == "miniGiraffe") %>%
+  print(n=24)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 24 × 8
+# Groups:   TestCase, Threads [24]
+   TestCase Threads Makespan Baseline Speedup Origin            Og  Diff
+   <chr>      <dbl>    <dbl>    <dbl>   <dbl> <chr>          <dbl> <dbl>
+ 1 A             48     9.06     186.   20.5  miniGiraffe     6.65  136.
+ 2 A             24    10.6      186.   17.5  miniGiraffe     8.59  124.
+ 3 A              8    26.6      186.    7.00 miniGiraffe    24.1   110.
+ 4 A              4    50.1      186.    3.71 miniGiraffe    45.8   109.
+ 5 A              2    95.5      186.    1.95 miniGiraffe    88.1   108.
+ 6 A              1   186.       186.    1    miniGiraffe   171.    109.
+ 7 B             48   149.      4302.   28.8  miniGiraffe   121.    124.
+ 8 B             24   206.      4302.   20.9  miniGiraffe   188.    109.
+ 9 B              8   577.      4302.    7.46 miniGiraffe   555.    104.
+10 B              4  1128.      4302.    3.81 miniGiraffe  1075.    105.
+11 B              2  2209.      4302.    1.95 miniGiraffe  2082.    106.
+12 B              1  4302.      4302.    1    miniGiraffe  4068.    106.
+13 C             48   825.     27045.   32.8  miniGiraffe   770.    107.
+14 C             24  1275.     27045.   21.2  miniGiraffe  1190.    107.
+15 C              8  3721.     27045.    7.27 miniGiraffe  3518.    106.
+16 C              4  7264.     27045.    3.72 miniGiraffe  6573.    111.
+17 C              2 13687.     27045.    1.98 miniGiraffe 12566.    109.
+18 C              1 27045.     27045.    1    miniGiraffe 24989.    108.
+19 D             48    93.9     2741.   29.2  miniGiraffe    81.9   115.
+20 D             24   139.      2741.   19.7  miniGiraffe   126.    110.
+21 D              8   379.      2741.    7.24 miniGiraffe   354.    107.
+22 D              4   735.      2741.    3.73 miniGiraffe   685.    107.
+23 D              2  1395.      2741.    1.96 miniGiraffe  1299.    107.
+24 D              1  2741.      2741.    1    miniGiraffe  2561.    107.
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.3 %>%
+  filter(Threads == 48) %>%
+  arrange(Origin) %>%
+  group_by(TestCase) %>%
+  mutate(Og = 100 * Makespan / first(Makespan)) %>%
+  print()
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 7
+# Groups:   TestCase [4]
+  TestCase Threads Makespan Baseline Speedup Origin         Og
+  <chr>      <dbl>    <dbl>    <dbl>   <dbl> <chr>       <dbl>
+1 A             48     6.65     171.    25.6 Giraffe      100 
+2 B             48   121.      4068.    33.7 Giraffe      100 
+3 C             48   770.     24989.    32.5 Giraffe      100 
+4 D             48    81.9     2561.    31.3 Giraffe      100 
+5 A             48     9.06     186.    20.5 miniGiraffe  136.
+6 C             48   825.     27045.    32.8 miniGiraffe  107.
+7 D             48    93.9     2741.    29.2 miniGiraffe  115.
+8 B             48   149.      4302.    28.8 miniGiraffe  124.
+#+end_example
+
+** Using keylime new data
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             progress=FALSE,
+             col_names=FALSE,
+             col_types=cols()) %>%
+      rename(Query = X1, Start = X2, End = X3, Thread = X4)
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/3"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="A-human(.*)parsed",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+: # A tibble: 6 × 1
+:   SOURCE                                                                                                        
+:   <chr>                                                                                                         
+: 1 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/3/1_1_A-human_giraffe_parsed.csv    
+: 2 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/3/1_1_A-human_miniGiraffe_parsed.csv
+: 3 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/3/1_2_A-human_giraffe_parsed.csv    
+: 4 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/3/1_2_A-human_miniGiraffe_parsed.csv
+: 5 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/3/1_3_A-human_giraffe_parsed.csv    
+: 6 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/3/1_3_A-human_miniGiraffe_parsed.csv
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "EXP"), sep="/") %>%
+    separate(EXP, c("Threads", "Repetition", "InputSet", "Source", "XX8"), sep="_") %>%
+    #mutate(Machine = str_replace_all(Machine, "([.csv])", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    print() -> df.val
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 74,234,205 × 8
+   Threads Repetition InputSet Source  Query               Start       End Thread
+   <chr>   <chr>      <chr>    <chr>   <chr>               <dbl>     <dbl>  <dbl>
+ 1 1       1          A-human  giraffe total_extension 13589144. 13589144.      0
+ 2 1       1          A-human  giraffe total_extension 13589144. 13589144.      0
+ 3 1       1          A-human  giraffe total_extension 13589144. 13589144.      0
+ 4 1       1          A-human  giraffe total_extension 13589144. 13589144.      0
+ 5 1       1          A-human  giraffe total_extension 13589144. 13589144.      0
+ 6 1       1          A-human  giraffe total_extension 13589144. 13589144.      0
+ 7 1       1          A-human  giraffe total_extension 13589144. 13589144.      0
+ 8 1       1          A-human  giraffe total_extension 13589144. 13589144.      0
+ 9 1       1          A-human  giraffe total_extension 13589144. 13589144.      0
+10 1       1          A-human  giraffe total_extension 13589144. 13589144.      0
+# ℹ 74,234,195 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.val %>%
+  mutate(Duration = End - Start) %>%
+  group_by(Repetition, InputSet, Source, Query) %>%
+  summarize(Runtime = sum(Duration)) %>%
+  print() -> df.val.run
+#+end_src
+
+#+RESULTS:
+#+begin_example
+`summarise()` has grouped output by 'Repetition', 'InputSet', 'Source'. You can override using the `.groups` argument.
+# A tibble: 9 × 5
+# Groups:   Repetition, InputSet, Source [6]
+  Repetition InputSet Source      Query           Runtime
+  <chr>      <chr>    <chr>       <chr>             <dbl>
+1 1          A-human  giraffe     total_extension    181.
+2 1          A-human  giraffe     total_main         704.
+3 1          A-human  miniGiraffe seeds-loop         204.
+4 2          A-human  giraffe     total_extension    180.
+5 2          A-human  giraffe     total_main         706.
+6 2          A-human  miniGiraffe seeds-loop         203.
+7 3          A-human  giraffe     total_extension    179.
+8 3          A-human  giraffe     total_main         705.
+9 3          A-human  miniGiraffe seeds-loop         210.
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.val.run %>%
+  filter(Query %in% c("total_extension", "seeds-loop")) %>%
+  ungroup() %>%
+  group_by(InputSet, Source) %>%
+  summarize(AvgRun = mean(Runtime))
+#+end_src
+
+#+RESULTS:
+: `summarise()` has grouped output by 'InputSet'. You can override using the `.groups` argument.
+: # A tibble: 2 × 3
+: # Groups:   InputSet [1]
+:   InputSet Source      AvgRun
+:   <chr>    <chr>        <dbl>
+: 1 A-human  giraffe       180.
+: 2 A-human  miniGiraffe   206.
+
+There are the results from previuos run
+
+#+begin_example
+# A tibble: 8 × 6
+  TestCase Threads Makespan Baseline Speedup Origin     
+  <chr>      <dbl>    <dbl>    <dbl>   <dbl> <chr>      
+1 A              1     186.     186.       1 miniGiraffe
+2 A              1     171.     171.       1 Giraffe    
+3 B              1    4302.    4302.       1 miniGiraffe
+4 B              1    4068.    4068.       1 Giraffe    
+5 C              1   27045.   27045.       1 miniGiraffe
+6 C              1   24989.   24989.       1 Giraffe    
+7 D              1    2741.    2741.       1 miniGiraffe
+8 D              1    2561.    2561.       1 Giraffe
+#+end_example
+
+The difference is even higher in the new results...
+
+#+begin_src R :results output :session *R* :exports both
+(180 - 206) / 180 * 100
+(171 - 186) / 171 * 100
+#+end_src
+
+#+RESULTS:
+: [1] -14.44444
+: [1] -8.77193
+
+** Small check
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+df <- read_csv("./iiswc25/ispass7-A-1-48.csv.gz",
+             col_names=FALSE,
+             progress=FALSE,
+             col_types=cols())
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+  rename(Query = X1, Start = X2, End = X3, Thread = X4) %>%
+  mutate(Duration = End - Start) %>%
+  group_by(Query, Thread) %>%
+  summarize(Runtime = sum(Duration)) %>%
+  ungroup() %>%
+  group_by(Query) %>%
+  summarize(Makespan = max(Runtime)) %>%
+  filter(Query == "total_extension") %>%
+  print() -> df.test
+#+end_src
+
+#+RESULTS:
+: `summarise()` has grouped output by 'Query'. You can override using the `.groups` argument.
+: # A tibble: 1 × 2
+:   Query           Makespan
+:   <chr>              <dbl>
+: 1 total_extension     6.97
+
+#+begin_src R :results output :session *R* :exports both
+df.3 %>%
+  filter(Threads == 48 & TestCase == "A")
+#+end_src
+
+#+RESULTS:
+: # A tibble: 2 × 6
+:   TestCase Threads Makespan Baseline Speedup Origin     
+:   <chr>      <dbl>    <dbl>    <dbl>   <dbl> <chr>      
+: 1 A             48     9.06     186.    20.5 miniGiraffe
+: 2 A             48     6.65     171.    25.6 Giraffe
+
+Ok, there's a difference between Giraffe and miniGiraffe.
 * 5 - Scalability analysis
 ** Runtime
 #+begin_src R :results output :session *R* :exports both
@@ -334,7 +1143,7 @@ read_traces <- function(file) {
 #+begin_src R :results output :session *R* :exports both
 FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25"
 df <- tibble(SOURCE = list.files(FOLDER,
-                                 pattern="scalability",
+                                 pattern="scalability(.*).csv",
                                  recursive=TRUE,
                                  full.names=TRUE)
              )
@@ -342,40 +1151,45 @@ df
 #+end_src
 
 #+RESULTS:
-: # A tibble: 3 × 1
-:   SOURCE                                                         
-:   <chr>                                                          
-: 1 /soe/jessicadagostini/miniGiraffe/iiswc25/scalability-amd.csv  
-: 2 /soe/jessicadagostini/miniGiraffe/iiswc25/scalability-arm.csv  
-: 3 /soe/jessicadagostini/miniGiraffe/iiswc25/scalability-intel.csv
+: # A tibble: 4 × 1
+:   SOURCE                                                               
+:   <chr>                                                                
+: 1 /soe/jessicadagostini/miniGiraffe/iiswc25/scalability_chi-arm.csv    
+: 2 /soe/jessicadagostini/miniGiraffe/iiswc25/scalability_chi-intel.csv  
+: 3 /soe/jessicadagostini/miniGiraffe/iiswc25/scalability_local-amd.csv  
+: 4 /soe/jessicadagostini/miniGiraffe/iiswc25/scalability_local-intel.csv
 
 #+begin_src R :results output :session *R* :exports both
 df %>%
     mutate(DATA = map(SOURCE, read_traces)) %>%
     separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "EXP"), sep="/") %>%
-    separate(EXP, c("XX6", "Machine"), sep="-") %>%
-    mutate(Machine = str_replace_all(Machine, "([.csv])", "")) %>%
+    separate(EXP, c("XX6", "Machine"), sep="_") %>%
+    mutate(Machine = str_replace_all(Machine, "(.csv)", "")) %>%
     select(-contains("XX")) %>%
     unnest(DATA) %>%
+    mutate(InputSet = case_when(InputSet == "1000GP" ~ "A-human",
+                                InputSet == "yeast" ~ "B-yeast",
+                                InputSet == "grch38" ~ "C-HPRC",
+                                InputSet == "chm13" ~ "D-HPRC")) %>%
     print() -> df.5
 #+end_src
 
 #+RESULTS:
 #+begin_example
-# A tibble: 172 × 8
+# A tibble: 212 × 8
    Machine Threads Scheduler CacheSize InputSet AvgMakespan Baseline Speedup
    <chr>     <dbl> <chr>         <dbl> <chr>          <dbl>    <dbl>   <dbl>
- 1 amd           1 omp             256 1000GP         139.      139.    1   
- 2 amd           1 omp             256 chm13        20355.    20355.    1   
- 3 amd           1 omp             256 grch38        2054.     2054.    1   
- 4 amd           1 omp             256 yeast         3290.     3290.    1   
- 5 amd           1 ws              256 1000GP         140.      140.    1   
- 6 amd           1 ws              256 chm13        20453.    20453.    1   
- 7 amd           1 ws              256 grch38        2072.     2072.    1   
- 8 amd           1 ws              256 yeast         3223.     3223.    1   
- 9 amd           2 omp             256 1000GP          69.9     139.    1.99
-10 amd           2 omp             256 chm13        10190.    20355.    2.00
-# ℹ 162 more rows
+ 1 chi-arm       1 omp             256 A-human         401.     401.    1   
+ 2 chi-arm       1 omp             256 C-HPRC         5706.    5706.    1   
+ 3 chi-arm       1 omp             256 B-yeast        8682.    8682.    1   
+ 4 chi-arm       1 ws              256 A-human         400.     400.    1   
+ 5 chi-arm       1 ws              256 C-HPRC         5626.    5626.    1   
+ 6 chi-arm       2 omp             256 A-human         211.     401.    1.90
+ 7 chi-arm       2 omp             256 C-HPRC         2864.    5706.    1.99
+ 8 chi-arm       2 omp             256 B-yeast        4348.    8682.    2.00
+ 9 chi-arm       2 ws              256 A-human         209.     400.    1.92
+10 chi-arm       2 ws              256 C-HPRC         2838.    5626.    1.98
+# ℹ 202 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
 
@@ -394,26 +1208,64 @@ df.5 %>%
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-IxsbR2/figuresV5lpS.png]]
+[[file:/tmp/babel-6kpow7/figureUi6J7R.png]]
 
 Line plot
-#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1000 :height 600 :session *R*
-df.5 %>%
-  #filter(Scheduler == "omp") %>%
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 800 :height 600 :session *R*
+p <- df.5 %>%
+  filter(Scheduler == "omp") %>%
+  mutate(Machine = factor(Machine, c("local-intel", "local-amd", "chi-arm", "chi-intel"))) %>%
   ggplot(aes(x=Threads, y=Speedup, color=InputSet)) +
   geom_line() +
   geom_point() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black") +
   scale_x_continuous("Threads", breaks=df.5$Threads) +
-  facet_grid(Scheduler~Machine, scales="free_x") +
+  facet_wrap(~Machine, scales="free_x") +
+  ylim(0, 100) +
   theme_bw() +
   theme(legend.position = "top",
         text = element_text(size = 20),
         axis.text.y = element_text(angle = 45, hjust = 1, size=15),
         axis.text.x = element_text(angle = 45, hjust = 1, size=15))
+p
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-IxsbR2/figurevmi6wv.png]]
+[[file:/tmp/babel-6kpow7/figurehFj5kH.png]]
+
+#+begin_src R :results graphics file :file ./iiswc25/img/scalability-diff-machines.pdf :exports both :width 8 :height 6 :session *R*
+p
+#+end_src
+
+#+RESULTS:
+[[file:./iiswc25/img/scalability-diff-machines.pdf]]
+
+#+begin_src R :results output :session *R* :exports both
+df.5 %>%
+  filter(Machine == "chi-arm" & InputSet == "grch38") %>%
+  arrange(AvgMakespan)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 14 × 8
+   Machine Threads Scheduler CacheSize InputSet AvgMakespan Baseline Speedup
+   <chr>     <dbl> <chr>         <dbl> <chr>          <dbl>    <dbl>   <dbl>
+ 1 chi-arm      64 omp             256 grch38          97.9    5706.   58.3 
+ 2 chi-arm      64 ws              256 grch38          98.0    5626.   57.4 
+ 3 chi-arm      32 ws              256 grch38         182.     5626.   30.9 
+ 4 chi-arm      32 omp             256 grch38         183.     5706.   31.1 
+ 5 chi-arm      16 ws              256 grch38         352.     5626.   16.0 
+ 6 chi-arm      16 omp             256 grch38         359.     5706.   15.9 
+ 7 chi-arm       8 ws              256 grch38         700.     5626.    8.03
+ 8 chi-arm       8 omp             256 grch38         715.     5706.    7.98
+ 9 chi-arm       4 ws              256 grch38        1407.     5626.    4.00
+10 chi-arm       4 omp             256 grch38        1434.     5706.    3.98
+11 chi-arm       2 ws              256 grch38        2838.     5626.    1.98
+12 chi-arm       2 omp             256 grch38        2864.     5706.    1.99
+13 chi-arm       1 ws              256 grch38        5626.     5626.    1   
+14 chi-arm       1 omp             256 grch38        5706.     5706.    1
+#+end_example
 
 ** Hw metrics
 #+begin_src R :results output :session *R* :exports both
@@ -570,7 +1422,6 @@ df.hw5.summ %>%
 :   <chr>   <chr>            <dbl>         <dbl>           <dbl>           <dbl>     <dbl>       <dbl>
 : 1 amd     1000GP      205425758.     38084535.   221723711256.     3982139181.  18.5            1.80
 : 2 intel   1000GP   388735976158.     36153698.   222991333209.     4770835122.   0.00930        2.14
-
 
 * 5.1 - Collect scalability on Intel
 ** 1000GP
@@ -753,13 +1604,13 @@ df.5.1.makespan %>%
   mutate(Baseline = first(AvgMakespan),
          Speedup = Baseline/AvgMakespan) %>%
   select(-MedianMakespan) %>%
-  write_csv("iiswc25/scalability-intel.csv") %>%
+  write_csv("iiswc25/scalability_local-intel.csv") %>%
   print() -> df.5.1.speedup
 #+end_src
 
 #+RESULTS:
 #+begin_example
-wrote 1.00TB in  0s, 83.89PB/s                                                                                                                          # A tibble: 64 × 7
+wrote 1.00TB in  0s, 62.60PB/s                                                                                                                          # A tibble: 64 × 7
 # Groups:   Scheduler, InputSet [8]
    Threads Scheduler CacheSize InputSet AvgMakespan Baseline Speedup
      <int> <chr>         <int> <chr>          <dbl>    <dbl>   <dbl>
@@ -943,13 +1794,13 @@ df.5.2.makespan %>%
   mutate(Baseline = first(AvgMakespan),
          Speedup = Baseline/AvgMakespan) %>%
   select(-MedianMakespan) %>%
-  write_csv("iiswc25/scalability-amd.csv") %>%
+  write_csv("iiswc25/scalability_local-amd.csv") %>%
   print() -> df.5.2.speedup
 #+end_src
 
 #+RESULTS:
 #+begin_example
-wrote 1.00TB in  0s, 20.07PB/s                                                                                                                          # A tibble: 80 × 7
+wrote 1.00TB in  0s, 66.58PB/s                                                                                                                          # A tibble: 80 × 7
 # Groups:   Scheduler, InputSet [8]
    Threads Scheduler CacheSize InputSet AvgMakespan Baseline Speedup
      <int> <chr>         <int> <chr>          <dbl>    <dbl>   <dbl>
@@ -1013,7 +1864,7 @@ read_traces <- function(file) {
 #+begin_src R :results output :session *R* :exports both
 FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3"
 df <- tibble(SOURCE = list.files(FOLDER,
-                                 pattern="miniGiraffe256",
+                                 pattern="256",
                                  recursive=TRUE,
                                  full.names=TRUE)
              )
@@ -1022,20 +1873,20 @@ df
 
 #+RESULTS:
 #+begin_example
-# A tibble: 84 × 1
+# A tibble: 91 × 1
    SOURCE                                                                                           
    <chr>                                                                                            
  1 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_0_1000GP_miniGiraffe256.csv
  2 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_0_grch38_miniGiraffe256.csv
- 3 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_1_1000GP_miniGiraffe256.csv
- 4 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_1_grch38_miniGiraffe256.csv
- 5 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_2_1000GP_miniGiraffe256.csv
- 6 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_2_grch38_miniGiraffe256.csv
- 7 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_ws_0_1000GP_miniGiraffe256.csv 
- 8 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_ws_0_grch38_miniGiraffe256.csv 
- 9 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_ws_1_1000GP_miniGiraffe256.csv 
-10 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_ws_1_grch38_miniGiraffe256.csv 
-# ℹ 74 more rows
+ 3 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_0_yeast_256.csv            
+ 4 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_1_1000GP_miniGiraffe256.csv
+ 5 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_1_grch38_miniGiraffe256.csv
+ 6 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_2_1000GP_miniGiraffe256.csv
+ 7 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_omp_2_grch38_miniGiraffe256.csv
+ 8 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_ws_0_1000GP_miniGiraffe256.csv 
+ 9 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_ws_0_grch38_miniGiraffe256.csv 
+10 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/5-3/512_1_ws_1_1000GP_miniGiraffe256.csv 
+# ℹ 81 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
 
@@ -1057,20 +1908,20 @@ df %>%
 
 #+RESULTS:
 #+begin_example
-# A tibble: 1,692 × 9
+# A tibble: 1,833 × 9
    Batches Threads Scheduler Repetition InputSet CacheSize Query         Runtime Thread
      <int>   <int> <chr>          <int> <chr>        <int> <chr>           <dbl>  <dbl>
- 1     512       1 omp                0 1000GP         256 reading-gbz     123.       0
- 2     512       1 omp                0 1000GP         256 reading-seeds    35.0      0
- 3     512       1 omp                0 1000GP         256 seeds-loop      401.       0
- 4     512       1 omp                0 grch38         256 reading-gbz      76.5      0
- 5     512       1 omp                0 grch38         256 reading-seeds   287.       0
- 6     512       1 omp                0 grch38         256 seeds-loop     5689.       0
- 7     512       1 omp                1 1000GP         256 reading-gbz     120.       0
- 8     512       1 omp                1 1000GP         256 reading-seeds    35.7      0
- 9     512       1 omp                1 1000GP         256 seeds-loop      397.       0
-10     512       1 omp                1 grch38         256 reading-gbz      78.0      0
-# ℹ 1,682 more rows
+ 1     512       1 omp                0 1000GP         256 reading-gbz    123.        0
+ 2     512       1 omp                0 1000GP         256 reading-seeds   35.0       0
+ 3     512       1 omp                0 1000GP         256 seeds-loop     401.        0
+ 4     512       1 omp                0 grch38         256 reading-gbz     76.5       0
+ 5     512       1 omp                0 grch38         256 reading-seeds  287.        0
+ 6     512       1 omp                0 grch38         256 seeds-loop    5689.        0
+ 7     512       1 omp                0 yeast          256 reading-gbz      1.36      0
+ 8     512       1 omp                0 yeast          256 reading-seeds  107.        0
+ 9     512       1 omp                0 yeast          256 seeds-loop    8682.        0
+10     512       1 omp                1 1000GP         256 reading-gbz    120.        0
+# ℹ 1,823 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
 
@@ -1092,21 +1943,21 @@ df.5.3 %>%
 `summarise()` has grouped output by 'Threads', 'Scheduler', 'Repetition', 'CacheSize'. You can override using the `.groups`
 argument.
 `summarise()` has grouped output by 'Threads', 'Scheduler', 'CacheSize'. You can override using the `.groups` argument.
-# A tibble: 28 × 6
+# A tibble: 35 × 6
 # Groups:   Threads, Scheduler, CacheSize [14]
    Threads Scheduler CacheSize InputSet AvgMakespan MedianMakespan
      <int> <chr>         <int> <chr>          <dbl>          <dbl>
  1       1 omp             256 1000GP          401.           401.
  2       1 omp             256 grch38         5706.          5689.
- 3       1 ws              256 1000GP          400.           402.
- 4       1 ws              256 grch38         5626.          5631.
- 5       2 omp             256 1000GP          211.           211.
- 6       2 omp             256 grch38         2864.          2866.
- 7       2 ws              256 1000GP          209.           209.
- 8       2 ws              256 grch38         2838.          2835.
- 9       4 omp             256 1000GP          107.           107.
-10       4 omp             256 grch38         1434.          1437.
-# ℹ 18 more rows
+ 3       1 omp             256 yeast          8682.          8682.
+ 4       1 ws              256 1000GP          400.           402.
+ 5       1 ws              256 grch38         5626.          5631.
+ 6       2 omp             256 1000GP          211.           211.
+ 7       2 omp             256 grch38         2864.          2866.
+ 8       2 omp             256 yeast          4348.          4348.
+ 9       2 ws              256 1000GP          209.           209.
+10       2 ws              256 grch38         2838.          2835.
+# ℹ 25 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
 
@@ -1121,7 +1972,7 @@ df.5.3.makespan %>%
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-3a1M9r/figureWZebfj.png]]
+[[file:/tmp/babel-m6pXWy/figureTSlIka.png]]
 
 #+begin_src R :results output :session *R* :exports both
 df.5.3.makespan %>%
@@ -1131,27 +1982,230 @@ df.5.3.makespan %>%
   mutate(Baseline = first(AvgMakespan),
          Speedup = Baseline/AvgMakespan) %>%
   select(-MedianMakespan) %>%
-  write_csv("iiswc25/scalability-arm.csv") %>%
+  write_csv("iiswc25/scalability_chi-arm.csv") %>%
   print() -> df.5.3.speedup
 #+end_src
 
 #+RESULTS:
 #+begin_example
-wrote 1.00TB in  0s, 49.93PB/s                                                                                                                          # A tibble: 28 × 7
-# Groups:   Scheduler, InputSet [4]
+wrote 1.00TB in  0s, 59.07PB/s                                                                                                                          # A tibble: 35 × 7
+# Groups:   Scheduler, InputSet [5]
    Threads Scheduler CacheSize InputSet AvgMakespan Baseline Speedup
      <int> <chr>         <int> <chr>          <dbl>    <dbl>   <dbl>
  1       1 omp             256 1000GP          401.     401.    1   
  2       1 omp             256 grch38         5706.    5706.    1   
- 3       1 ws              256 1000GP          400.     400.    1   
- 4       1 ws              256 grch38         5626.    5626.    1   
- 5       2 omp             256 1000GP          211.     401.    1.90
- 6       2 omp             256 grch38         2864.    5706.    1.99
- 7       2 ws              256 1000GP          209.     400.    1.92
- 8       2 ws              256 grch38         2838.    5626.    1.98
- 9       4 omp             256 1000GP          107.     401.    3.74
-10       4 omp             256 grch38         1434.    5706.    3.98
-# ℹ 18 more rows
+ 3       1 omp             256 yeast          8682.    8682.    1   
+ 4       1 ws              256 1000GP          400.     400.    1   
+ 5       1 ws              256 grch38         5626.    5626.    1   
+ 6       2 omp             256 1000GP          211.     401.    1.90
+ 7       2 omp             256 grch38         2864.    5706.    1.99
+ 8       2 omp             256 yeast          4348.    8682.    2.00
+ 9       2 ws              256 1000GP          209.     400.    1.92
+10       2 ws              256 grch38         2838.    5626.    1.98
+# ℹ 25 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1000 :height 400 :session *R*
+df.5.3.speedup %>%
+  ggplot(aes(x=Threads, y=Speedup, color=Scheduler)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous("Threads", breaks=df.5.2.speedup$Threads) +
+  facet_wrap(~InputSet) +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(angle = 45, hjust = 1, size=15),
+        axis.text.x = element_text(angle = 45, hjust = 1, size=15))
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figurePVMjRc.png]]
+
+* 5.5 - Collect scalability on chi-intel
+** Analysis
+Group reading data
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             skip = 1,
+             progress=FALSE,
+             col_names=FALSE,
+             col_types=cols()) %>%
+        rename(Query = X1, Runtime = X2, Thread = X3)
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="256",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 66 × 1
+   SOURCE                                                                                                    
+   <chr>                                                                                                     
+ 1 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5/512_1_omp_0_1000GP_256.csv  
+ 2 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5/512_1_omp_0_grch38_256.csv  
+ 3 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5/512_1_omp_0_yeast_256.csv   
+ 4 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5/512_1_omp_1_1000GP_256.csv  
+ 5 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5/512_1_omp_1_grch38_256.csv  
+ 6 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5/512_1_omp_1_yeast_256.csv   
+ 7 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5/512_128_omp_0_1000GP_256.csv
+ 8 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5/512_128_omp_0_grch38_256.csv
+ 9 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5/512_128_omp_0_yeast_256.csv 
+10 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/5-5/512_128_omp_1_1000GP_256.csv
+# ℹ 56 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "EXP"), sep="/") %>%
+    separate(EXP, c("Batches", "Threads", "Scheduler", "Repetition", "InputSet", "CacheSize"), sep="_") %>%
+    mutate(CacheSize = str_replace_all(CacheSize, "([minGrafe.csv])", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    mutate(CacheSize = ifelse(CacheSize == "NC", "0", CacheSize)) %>%
+    mutate(Batches = as.integer(Batches),
+           Threads = as.integer(Threads),
+           Repetition = as.integer(Repetition),
+           CacheSize = as.integer(CacheSize)) %>%
+  print() -> df.5.5
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 3,630 × 9
+   Batches Threads Scheduler Repetition InputSet CacheSize Query          Runtime Thread
+     <int>   <int> <chr>          <int> <chr>        <int> <chr>            <dbl>  <dbl>
+ 1     512       1 omp                0 1000GP         256 reading-gbz     93.0        0
+ 2     512       1 omp                0 1000GP         256 reading-seeds   19.7        0
+ 3     512       1 omp                0 1000GP         256 seeds-loop     215.         0
+ 4     512       1 omp                0 grch38         256 reading-gbz     31.9        0
+ 5     512       1 omp                0 grch38         256 reading-seeds  160.         0
+ 6     512       1 omp                0 grch38         256 seeds-loop    3175.         0
+ 7     512       1 omp                0 yeast          256 reading-gbz      0.907      0
+ 8     512       1 omp                0 yeast          256 reading-seeds   61.6        0
+ 9     512       1 omp                0 yeast          256 seeds-loop    4941.         0
+10     512       1 omp                1 1000GP         256 reading-gbz     49.9        0
+# ℹ 3,620 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+For grouping makespan
+#+begin_src R :results output :session *R* :exports both
+df.5.5 %>%
+  filter(Query == "seeds-loop") %>%
+  group_by(Threads, Scheduler, Repetition, CacheSize, InputSet) %>%
+  summarize(Makespan = max(Runtime)) %>%
+  ungroup() %>%
+  group_by(Threads, Scheduler, CacheSize, InputSet) %>%
+  summarize(AvgMakespan = mean(Makespan),
+            MedianMakespan = median(Makespan)) %>%
+  print(n=33) -> df.5.5.makespan
+#+end_src
+
+#+RESULTS:
+#+begin_example
+`summarise()` has grouped output by 'Threads', 'Scheduler', 'Repetition', 'CacheSize'. You can override using the `.groups`
+argument.
+`summarise()` has grouped output by 'Threads', 'Scheduler', 'CacheSize'. You can override using the `.groups` argument.
+# A tibble: 33 × 6
+# Groups:   Threads, Scheduler, CacheSize [11]
+   Threads Scheduler CacheSize InputSet AvgMakespan MedianMakespan
+     <int> <chr>         <int> <chr>          <dbl>          <dbl>
+ 1       1 omp             256 1000GP        214.           214.  
+ 2       1 omp             256 grch38       3162.          3162.  
+ 3       1 omp             256 yeast        4946.          4946.  
+ 4       2 omp             256 1000GP        106.           106.  
+ 5       2 omp             256 grch38       1582.          1582.  
+ 6       2 omp             256 yeast        2471.          2471.  
+ 7       4 omp             256 1000GP         54.1           54.1 
+ 8       4 omp             256 grch38        801.           801.  
+ 9       4 omp             256 yeast        1241.          1241.  
+10       8 omp             256 1000GP         28.0           28.0 
+11       8 omp             256 grch38        401.           401.  
+12       8 omp             256 yeast         620.           620.  
+13      16 omp             256 1000GP         14.3           14.3 
+14      16 omp             256 grch38        202.           202.  
+15      16 omp             256 yeast         311.           311.  
+16      32 omp             256 1000GP          7.23           7.23
+17      32 omp             256 grch38        108.           108.  
+18      32 omp             256 yeast         157.           157.  
+19      64 omp             256 1000GP          4.55           4.55
+20      64 omp             256 grch38         92.7           92.7 
+21      64 omp             256 yeast          80.8           80.8 
+22      72 omp             256 1000GP          4.52           4.52
+23      72 omp             256 grch38         74.8           74.8 
+24      72 omp             256 yeast          73.8           73.8 
+25      96 omp             256 1000GP          3.78           3.78
+26      96 omp             256 grch38         60.4           60.4 
+27      96 omp             256 yeast          77.5           77.5 
+28     128 omp             256 1000GP          3.44           3.44
+29     128 omp             256 grch38         63.7           63.7 
+30     128 omp             256 yeast          77.3           77.3 
+31     160 omp             256 1000GP          6.70           6.70
+32     160 omp             256 grch38         59.4           59.4 
+33     160 omp             256 yeast          73.4           73.4
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1000 :height 400 :session *R*
+df.5.5.makespan %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=AvgMakespan, fill=CacheSize)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_grid(InputSet~Scheduler, scales="free") +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figureQWeZRm.png]]
+
+#+begin_src R :results output :session *R* :exports both
+df.5.5.makespan %>%
+  ungroup() %>%
+  arrange(Threads) %>%
+  group_by(Scheduler, InputSet) %>%
+  mutate(Baseline = first(AvgMakespan),
+         Speedup = Baseline/AvgMakespan) %>%
+  select(-MedianMakespan) %>%
+  write_csv("iiswc25/scalability_chi-intel.csv") %>%
+  print() -> df.5.5.speedup
+#+end_src
+
+#+RESULTS:
+#+begin_example
+wrote 1.00TB in  0s, 28.73PB/s                                                                                                                          # A tibble: 33 × 7
+# Groups:   Scheduler, InputSet [3]
+   Threads Scheduler CacheSize InputSet AvgMakespan Baseline Speedup
+     <int> <chr>         <int> <chr>          <dbl>    <dbl>   <dbl>
+ 1       1 omp             256 1000GP         214.      214.    1   
+ 2       1 omp             256 grch38        3162.     3162.    1   
+ 3       1 omp             256 yeast         4946.     4946.    1   
+ 4       2 omp             256 1000GP         106.      214.    2.02
+ 5       2 omp             256 grch38        1582.     3162.    2.00
+ 6       2 omp             256 yeast         2471.     4946.    2.00
+ 7       4 omp             256 1000GP          54.1     214.    3.96
+ 8       4 omp             256 grch38         801.     3162.    3.95
+ 9       4 omp             256 yeast         1241.     4946.    3.98
+10       8 omp             256 1000GP          28.0     214.    7.65
+# ℹ 23 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
 
@@ -5466,6 +6520,2777 @@ This script is ready and tested on ~iiswc25/tuning-pipeline.py~
 *** 1000GP
 Ran on Jun 4
 *** Yeast
+Ran on ?
 *** Grch38
 Ran on Jun 5
 *** Chm13
+Ran on ?
+
+*** Analysis
+Group reading data
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             skip = 1,
+             progress=FALSE,
+             col_names=FALSE,
+             col_types=cols()) %>%
+        rename(Query = X1, Runtime = X2, Thread = X3)
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="csv",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 450 × 1
+   SOURCE                                                                                                               
+   <chr>                                                                                                                
+ 1 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_omp_0_tuning_1024.csv
+ 2 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_omp_0_tuning_128.csv 
+ 3 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_omp_0_tuning_2048.csv
+ 4 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_omp_0_tuning_256.csv 
+ 5 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_omp_0_tuning_4096.csv
+ 6 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_omp_0_tuning_512.csv 
+ 7 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_ws_0_tuning_1024.csv 
+ 8 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_ws_0_tuning_128.csv  
+ 9 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_ws_0_tuning_2048.csv 
+10 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_ws_0_tuning_256.csv  
+# ℹ 440 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "InputSet", "EXP"), sep="/") %>%
+    separate(EXP, c("Batches", "Threads", "Scheduler", "Repetition", "Test", "CacheSize"), sep="_") %>%
+    mutate(CacheSize = str_replace_all(CacheSize, "([.csv])", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    #mutate(CacheSize = ifelse(CacheSize == "NC", "0", CacheSize)) %>%
+    mutate(Batches = as.integer(Batches),
+           Threads = as.integer(Threads),
+           Repetition = as.integer(Repetition),
+           CacheSize = as.integer(CacheSize)) %>%
+  print() -> df.7.1
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 33,516 × 10
+   InputSet Batches Threads Scheduler Repetition Test   CacheSize Query         Runtime Thread
+   <chr>      <int>   <int> <chr>          <int> <chr>      <int> <chr>           <dbl>  <dbl>
+ 1 1000GP      1024      48 omp                0 tuning      1024 reading-gbz    44.9        0
+ 2 1000GP      1024      48 omp                0 tuning      1024 reading-seeds   1.72       0
+ 3 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      0.988      0
+ 4 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      0.983      1
+ 5 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      1.01       2
+ 6 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      0.988      3
+ 7 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      0.887      4
+ 8 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      1.00       5
+ 9 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      0.997      6
+10 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      1.01       7
+# ℹ 33,506 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+For grouping makespan
+#+begin_src R :results output :session *R* :exports both
+df.7.1 %>%
+  filter(Query == "seeds-loop") %>%
+  group_by(InputSet, Batches, Threads, Scheduler, Repetition, CacheSize, Test) %>%
+  summarize(Makespan = max(Runtime)) %>%
+  print() -> df.7.1.makespan
+#+end_src
+
+#+RESULTS:
+#+begin_example
+`summarise()` has grouped output by 'InputSet', 'Batches', 'Threads', 'Scheduler', 'Repetition', 'CacheSize'. You can
+override using the `.groups` argument.
+# A tibble: 450 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [442]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 1000GP       128      48 omp                0       128 tuning    1.06 
+ 2 1000GP       128      48 omp                0       256 tuning    0.969
+ 3 1000GP       128      48 omp                0       512 tuning    0.980
+ 4 1000GP       128      48 omp                0      1024 tuning    1.01 
+ 5 1000GP       128      48 omp                0      2048 tuning    0.961
+ 6 1000GP       128      48 omp                0      4096 tuning    1.01 
+ 7 1000GP       128      48 ws                 0       128 tuning    1.07 
+ 8 1000GP       128      48 ws                 0       256 tuning    1.01 
+ 9 1000GP       128      48 ws                 0       512 tuning    1.01 
+10 1000GP       128      48 ws                 0      1024 tuning    0.994
+# ℹ 440 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.makespan %>%
+  filter(InputSet == "chm13" & Test == "tuning") %>%
+  print() -> df.7.1.chm13
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 102 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [102]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 chm13        128      48 omp                0       256 tuning     51.0
+ 2 chm13        128      48 omp                0       512 tuning     49.4
+ 3 chm13        128      48 omp                0      1024 tuning     50.3
+ 4 chm13        128      48 omp                0      2048 tuning     51.8
+ 5 chm13        128      48 omp                0      4096 tuning     49.7
+ 6 chm13        128      48 ws                 0       256 tuning     56.6
+ 7 chm13        128      48 ws                 0       512 tuning     74.4
+ 8 chm13        128      48 ws                 0      1024 tuning     57.0
+ 9 chm13        128      48 ws                 0      2048 tuning     68.1
+10 chm13        128      48 ws                 0      4096 tuning     64.8
+# ℹ 92 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.chm13 %>%
+  ungroup() %>%
+  arrange(Makespan) %>%
+  filter(Makespan == first(Makespan)) %>%
+  print() -> df.7.1.best
+#+end_src
+
+#+RESULTS:
+: # A tibble: 1 × 8
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+: 1 chm13        128      96 omp                0      2048 tuning     34.5
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.chm13 %>%
+  filter(Batches == 512 & Threads == 96 & Scheduler == "omp" & CacheSize == 256) %>%
+  print()
+#+end_src
+
+#+RESULTS:
+: # A tibble: 1 × 8
+: # Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [1]
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+: 1 chm13        512      96 omp                0       256 tuning     40.5
+
+#+begin_src R :results output :session *R* :exports both
+(40.5 - 34.5) / 40.5 * 100
+#+end_src
+
+#+RESULTS:
+: [1] 14.81481
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.chm13 %>%
+  filter(Batches == 128 & Threads == 48 & Scheduler == "omp" & CacheSize == 2048) %>%
+  print()
+#+end_src
+
+#+RESULTS:
+: # A tibble: 1 × 8
+: # Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [1]
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+: 1 chm13        128      48 omp                0      2048 tuning     51.8
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.chm13 %>%
+  filter(Batches == 512 & Threads == 48 & Scheduler == "omp" & CacheSize == 256) %>%
+  print()
+#+end_src
+
+#+RESULTS:
+: # A tibble: 1 × 8
+: # Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [1]
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+: 1 chm13        512      48 omp                0       256 tuning     52.0
+
+#+begin_src R :results output :session *R* :exports both
+(52 - 51.8) / 52 * 100
+#+end_src
+
+#+RESULTS:
+: [1] 0.3846154
+
+What is the best setting for 48 threads?
+#+begin_src R :results output :session *R* :exports both
+df.7.1.chm13 %>%
+  ungroup() %>%
+  filter(Threads == 48) %>%
+  arrange(Makespan) %>%
+  filter(Makespan == first(Makespan))
+#+end_src
+
+#+RESULTS:
+: # A tibble: 1 × 8
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+: 1 chm13       2048      48 omp                0      4096 tuning     48.8
+
+#+begin_src R :results output :session *R* :exports both
+100 * 48.8 / 52
+#+end_src
+
+#+RESULTS:
+: [1] 93.84615
+
+Brings 7% speed
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.chm13 %>%
+  filter(Batches == 128 & Threads == 72 & Scheduler == "omp" & CacheSize == 2048) %>%
+  print()
+#+end_src
+
+#+RESULTS:
+: # A tibble: 1 × 8
+: # Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [1]
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+: 1 chm13        128      72 omp                0      2048 tuning     41.3
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.chm13 %>%
+  filter(Batches == 512 & Threads == 72 & Scheduler == "omp" & CacheSize == 256) %>%
+  print()
+#+end_src
+
+#+RESULTS:
+: # A tibble: 1 × 8
+: # Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [1]
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+: 1 chm13        512      72 omp                0       256 tuning     40.5
+
+#+begin_src R :results output :session *R* :exports both
+(40.5 - 41.3) / 40.5 * 100
+#+end_src
+
+#+RESULTS:
+: [1] -1.975309
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+df.7.1.chm13 %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=CacheSize)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_grid(Scheduler~Batches) +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figureiHAdcO.png]]
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.makespan %>%
+  filter(InputSet == "grch38" & Test == "tuning") %>%
+  print() -> df.7.1.grch38
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 120 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [120]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 grch38       128      48 omp                0       128 tuning    11.5 
+ 2 grch38       128      48 omp                0       256 tuning    11.4 
+ 3 grch38       128      48 omp                0       512 tuning    10.3 
+ 4 grch38       128      48 omp                0      1024 tuning    10.9 
+ 5 grch38       128      48 omp                0      2048 tuning     9.89
+ 6 grch38       128      48 omp                0      4096 tuning     9.98
+ 7 grch38       128      48 ws                 0       128 tuning    11.8 
+ 8 grch38       128      48 ws                 0       256 tuning    11.4 
+ 9 grch38       128      48 ws                 0       512 tuning    11.7 
+10 grch38       128      48 ws                 0      1024 tuning    10.9 
+# ℹ 110 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+df.7.1.grch38 %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=CacheSize)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_grid(Scheduler~Batches) +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figuretVzRy1.png]]
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.grch38 %>%
+  ungroup() %>%
+  arrange(Makespan) %>%
+  filter(Makespan == first(Makespan))
+#+end_src
+
+#+RESULTS:
+: # A tibble: 1 × 8
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+: 1 grch38       256      96 omp                0      4096 tuning     8.04
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.grch38 %>%
+  filter(Batches == 512 & Threads == 96 & Scheduler == "omp" & CacheSize == 256) %>%
+  print()
+#+end_src
+
+#+RESULTS:
+: # A tibble: 1 × 8
+: # Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [1]
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+: 1 grch38       512      96 omp                0       256 tuning     10.4
+
+
+#+begin_src R :results output :session *R* :exports both
+100 - (8.04 * 100 / 10.4)
+#+end_src
+
+#+RESULTS:
+: [1] 22.69231
+
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.makespan %>%
+  filter(Test != "tuning") %>%
+  mutate(Machine = "local-intel") %>%
+  mutate(Execution = case_when((Batches == 512 & Threads == 96 & Scheduler == "omp" & CacheSize == 256) ~ "Original",
+                               TRUE ~ "Tunned")
+         ) %>%
+  write_csv("iiswc25/tuning-results-intel.csv") %>%
+  print() -> df.7.1.full
+#+end_src
+
+#+RESULTS:
+#+begin_example
+wrote 1.00TB in  0s, 47.66PB/s                                                                                                                          # A tibble: 8 × 10
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [8]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine     Execution
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>    <dbl> <chr>       <chr>    
+1 1000GP       256      96 omp                0      4096 full      6.96 local-intel Tunned   
+2 1000GP       512      96 omp                0       256 full     10.3  local-intel Original 
+3 chm13        128      96 omp                0      2048 full    700.   local-intel Tunned   
+4 chm13        512      96 omp                0       256 full    675.   local-intel Original 
+5 grch38       256      96 omp                0      4096 full     70.6  local-intel Tunned   
+6 grch38       512      96 omp                0       256 full     67.9  local-intel Original 
+7 yeast        128      96 ws                 0       512 full    115.   local-intel Tunned   
+8 yeast        512      96 omp                0       256 full    118.   local-intel Original
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.makespan %>%
+  ungroup() %>%
+  group_by(InputSet, Threads) %>%
+  filter(Makespan == min(Makespan),
+         Threads != 72) %>%
+  mutate(Setting = "tuned") %>%
+  print() -> df.7.1.best
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 9
+# Groups:   InputSet, Threads [8]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>  
+1 1000GP       256      96 omp                0      4096 tuning    0.623 tuned  
+2 1000GP       512      48 omp                0      1024 tuning    0.936 tuned  
+3 chm13        128      96 omp                0      2048 tuning   34.5   tuned  
+4 chm13       2048      48 omp                0      4096 tuning   48.8   tuned  
+5 grch38       256      96 omp                0      4096 tuning    8.04  tuned  
+6 grch38      1024      48 omp                0       128 tuning    8.86  tuned  
+7 yeast        128      48 omp                0      4096 tuning    5.91  tuned  
+8 yeast        128      96 ws                 0       512 tuning    5.49  tuned
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.makespan %>%
+  ungroup() %>%
+  group_by(InputSet, Threads) %>%
+  filter(Batches == 512 & Scheduler == "omp" & CacheSize == 256 & Test == "tuning") %>%
+  mutate(Setting = "original") %>%
+  print() -> df.7.1.original
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 9 × 9
+# Groups:   InputSet, Threads [9]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
+1 1000GP       512      48 omp                0       256 tuning     1.08 original
+2 1000GP       512      96 omp                0       256 tuning     1.47 original
+3 chm13        512      48 omp                0       256 tuning    52.0  original
+4 chm13        512      72 omp                0       256 tuning    40.5  original
+5 chm13        512      96 omp                0       256 tuning    40.5  original
+6 grch38       512      48 omp                0       256 tuning    10.9  original
+7 grch38       512      96 omp                0       256 tuning    10.4  original
+8 yeast        512      48 omp                0       256 tuning     7.18 original
+9 yeast        512      96 omp                0       256 tuning     5.84 original
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.original %>%
+  bind_rows(df.7.1.best) %>%
+  #arrange(Makespan) %>%
+  #mutate(Baseline = first(Makespan),
+  #       Percent = 100 * Baseline / Makespan) %>%
+  print() -> df.7.1.compare
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 17 × 9
+# Groups:   InputSet, Threads [9]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
+ 1 1000GP       512      48 omp                0       256 tuning    1.08  original
+ 2 1000GP       512      96 omp                0       256 tuning    1.47  original
+ 3 chm13        512      48 omp                0       256 tuning   52.0   original
+ 4 chm13        512      72 omp                0       256 tuning   40.5   original
+ 5 chm13        512      96 omp                0       256 tuning   40.5   original
+ 6 grch38       512      48 omp                0       256 tuning   10.9   original
+ 7 grch38       512      96 omp                0       256 tuning   10.4   original
+ 8 yeast        512      48 omp                0       256 tuning    7.18  original
+ 9 yeast        512      96 omp                0       256 tuning    5.84  original
+10 1000GP       256      96 omp                0      4096 tuning    0.623 tuned   
+11 1000GP       512      48 omp                0      1024 tuning    0.936 tuned   
+12 chm13        128      96 omp                0      2048 tuning   34.5   tuned   
+13 chm13       2048      48 omp                0      4096 tuning   48.8   tuned   
+14 grch38       256      96 omp                0      4096 tuning    8.04  tuned   
+15 grch38      1024      48 omp                0       128 tuning    8.86  tuned   
+16 yeast        128      48 omp                0      4096 tuning    5.91  tuned   
+17 yeast        128      96 ws                 0       512 tuning    5.49  tuned
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+improvement.7.1 <- df.7.1.compare %>%
+  
+  # 1. Select only the columns needed for this operation.
+  # This defines the "key" (InputSet, Threads) for pairing and the values to reshape.
+  select(InputSet, Threads, Setting, Makespan) %>%
+  
+  # 2. Reshape the data from a "long" to a "wide" format.
+  # This creates separate columns for 'original' and 'tuned' Makespan values.
+  pivot_wider(
+    names_from = Setting,
+    values_from = Makespan
+  ) %>%
+  
+  # 3. Remove rows where a pair could not be found 
+  # (e.g., an 'original' without a 'tuned' counterpart).
+  filter(!is.na(original) & !is.na(tuned)) %>%
+  
+  # 4. Calculate the percentage improvement.
+  # Formula: ((Original - Tuned) / Original) * 100
+  mutate(
+    Percent = ((original - tuned) / original) * 100
+  )
+
+# Print the resulting dataframe to see the output
+print(improvement.7.1)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 5
+# Groups:   InputSet, Threads [8]
+  InputSet Threads original  tuned Percent
+  <chr>      <int>    <dbl>  <dbl>   <dbl>
+1 1000GP        48     1.08  0.936   13.6 
+2 1000GP        96     1.47  0.623   57.6 
+3 chm13         48    52.0  48.8      6.05
+4 chm13         96    40.5  34.5     14.9 
+5 grch38        48    10.9   8.86    18.9 
+6 grch38        96    10.4   8.04    22.5 
+7 yeast         48     7.18  5.91    17.7 
+8 yeast         96     5.84  5.49     6.03
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.compare %>%
+  filter(Threads != 72) %>%
+  left_join(improvement.7.1, by=c("InputSet", "Threads")) %>%
+  select(-original, -tuned) %>%
+  write_csv("./iiswc25/best_results_tuning_intel.csv") %>%
+  print() -> df.7.1.compare
+#+end_src
+
+#+RESULTS:
+#+begin_example
+wrote 1.00TB in  0s, 55.19PB/s                                                                                                                          # A tibble: 16 × 10
+# Groups:   InputSet, Threads [8]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting  Percent
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>      <dbl>
+ 1 1000GP       512      48 omp                0       256 tuning    1.08  original   13.6 
+ 2 1000GP       512      96 omp                0       256 tuning    1.47  original   57.6 
+ 3 chm13        512      48 omp                0       256 tuning   52.0   original    6.05
+ 4 chm13        512      96 omp                0       256 tuning   40.5   original   14.9 
+ 5 grch38       512      48 omp                0       256 tuning   10.9   original   18.9 
+ 6 grch38       512      96 omp                0       256 tuning   10.4   original   22.5 
+ 7 yeast        512      48 omp                0       256 tuning    7.18  original   17.7 
+ 8 yeast        512      96 omp                0       256 tuning    5.84  original    6.03
+ 9 1000GP       256      96 omp                0      4096 tuning    0.623 tuned      57.6 
+10 1000GP       512      48 omp                0      1024 tuning    0.936 tuned      13.6 
+11 chm13        128      96 omp                0      2048 tuning   34.5   tuned      14.9 
+12 chm13       2048      48 omp                0      4096 tuning   48.8   tuned       6.05
+13 grch38       256      96 omp                0      4096 tuning    8.04  tuned      22.5 
+14 grch38      1024      48 omp                0       128 tuning    8.86  tuned      18.9 
+15 yeast        128      48 omp                0      4096 tuning    5.91  tuned      17.7 
+16 yeast        128      96 ws                 0       512 tuning    5.49  tuned       6.03
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+dodge_width <- 0.9
+df.7.1.compare %>%
+  filter(Threads != 72) %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=Setting)) +
+  geom_bar(stat = "identity", width = 0.8, position = "dodge") +
+  # Text annotation layer
+  geom_text(
+    # This is the key part:
+    # We filter the data for this layer to only include 'original' executions
+    # that have a percentage greater than 0.
+    data = . %>% filter(Setting == 'original', !is.na(Percent)),
+      # Define the aesthetics for the label.
+    # We format the 'Percent' column to one decimal place and add a '%' sign.
+    aes(label = paste0(round(Percent, 1), "%")),
+    
+    # Dodge the text to align with the corresponding bars.
+    # It's crucial that this matches the bar's dodge width.
+    position = position_dodge(width = 0.9),
+    
+    # Adjust the vertical position to be slightly above the bar.
+    vjust = 1.5,
+    
+    # Set the font size for readability.
+    size = 6
+  ) +
+  facet_wrap(~InputSet, scales="free") +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figureMMetpz.png]]
+
+
+** 7.2 - Tuning on tangerine
+*** 1000GP
+Running on Jun 9
+*** Yeast
+Ran on June 6
+*** Grch38
+Ran on June 8
+*** Chm13
+Ran on June 5
+*** Analysis
+Group reading data
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             skip = 1,
+             progress=FALSE,
+             col_names=FALSE,
+             col_types=cols()) %>%
+        rename(Query = X1, Runtime = X2, Thread = X3)
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="csv",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 408 × 1
+   SOURCE                                                                                                            
+   <chr>                                                                                                             
+ 1 /soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning/1000GP/1024_128_omp_0_tuning_1024.csv
+ 2 /soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning/1000GP/1024_128_omp_0_tuning_2048.csv
+ 3 /soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning/1000GP/1024_128_omp_0_tuning_256.csv 
+ 4 /soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning/1000GP/1024_128_omp_0_tuning_4096.csv
+ 5 /soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning/1000GP/1024_128_omp_0_tuning_512.csv 
+ 6 /soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning/1000GP/1024_128_ws_0_tuning_1024.csv 
+ 7 /soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning/1000GP/1024_128_ws_0_tuning_2048.csv 
+ 8 /soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning/1000GP/1024_128_ws_0_tuning_256.csv  
+ 9 /soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning/1000GP/1024_128_ws_0_tuning_4096.csv 
+10 /soe/jessicadagostini/miniGiraffe/iiswc25/amdepyc955464-coreprocessor/tuning/1000GP/1024_128_ws_0_tuning_512.csv  
+# ℹ 398 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "InputSet", "EXP"), sep="/") %>%
+    separate(EXP, c("Batches", "Threads", "Scheduler", "Repetition", "Test", "CacheSize"), sep="_") %>%
+    mutate(CacheSize = str_replace_all(CacheSize, "([.csv])", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    #mutate(CacheSize = ifelse(CacheSize == "NC", "0", CacheSize)) %>%
+    mutate(Batches = as.integer(Batches),
+           Threads = as.integer(Threads),
+           Repetition = as.integer(Repetition),
+           CacheSize = as.integer(CacheSize)) %>%
+  print() -> df.7.2
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 40,240 × 10
+   InputSet Batches Threads Scheduler Repetition Test   CacheSize Query         Runtime Thread
+   <chr>      <int>   <int> <chr>          <int> <chr>      <int> <chr>           <dbl>  <dbl>
+ 1 1000GP      1024     128 omp                0 tuning      1024 reading-gbz    29.2        0
+ 2 1000GP      1024     128 omp                0 tuning      1024 reading-seeds   1.33       0
+ 3 1000GP      1024     128 omp                0 tuning      1024 seeds-loop      0.169      0
+ 4 1000GP      1024     128 omp                0 tuning      1024 seeds-loop      0.187      1
+ 5 1000GP      1024     128 omp                0 tuning      1024 seeds-loop      0.192      2
+ 6 1000GP      1024     128 omp                0 tuning      1024 seeds-loop      0.165      3
+ 7 1000GP      1024     128 omp                0 tuning      1024 seeds-loop      0.171      4
+ 8 1000GP      1024     128 omp                0 tuning      1024 seeds-loop      0.166      5
+ 9 1000GP      1024     128 omp                0 tuning      1024 seeds-loop      0.148      6
+10 1000GP      1024     128 omp                0 tuning      1024 seeds-loop      0.135      7
+# ℹ 40,230 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+For grouping makespan
+#+begin_src R :results output :session *R* :exports both
+df.7.2 %>%
+  filter(Query == "seeds-loop") %>%
+  group_by(InputSet, Batches, Threads, Scheduler, Repetition, CacheSize, Test) %>%
+  summarize(Makespan = max(Runtime)) %>%
+  print() -> df.7.2.makespan
+#+end_src
+
+#+RESULTS:
+#+begin_example
+`summarise()` has grouped output by 'InputSet', 'Batches', 'Threads', 'Scheduler', 'Repetition', 'CacheSize'. You can
+override using the `.groups` argument.
+# A tibble: 408 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [400]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 1000GP       128      64 omp                0       256 tuning    0.268
+ 2 1000GP       128      64 omp                0       512 tuning    0.262
+ 3 1000GP       128      64 omp                0      1024 tuning    0.286
+ 4 1000GP       128      64 omp                0      2048 tuning    0.292
+ 5 1000GP       128      64 omp                0      4096 tuning    0.280
+ 6 1000GP       128      64 ws                 0       256 tuning    0.348
+ 7 1000GP       128      64 ws                 0       512 tuning    0.311
+ 8 1000GP       128      64 ws                 0      1024 tuning    0.317
+ 9 1000GP       128      64 ws                 0      2048 tuning    0.317
+10 1000GP       128      64 ws                 0      4096 tuning    0.322
+# ℹ 398 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.2.makespan %>%
+  filter(InputSet == "1000GP" & Test == "tuning") %>%
+  print() -> df.7.2.1000GP
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 100 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [100]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 1000GP       128      64 omp                0       256 tuning    0.268
+ 2 1000GP       128      64 omp                0       512 tuning    0.262
+ 3 1000GP       128      64 omp                0      1024 tuning    0.286
+ 4 1000GP       128      64 omp                0      2048 tuning    0.292
+ 5 1000GP       128      64 omp                0      4096 tuning    0.280
+ 6 1000GP       128      64 ws                 0       256 tuning    0.348
+ 7 1000GP       128      64 ws                 0       512 tuning    0.311
+ 8 1000GP       128      64 ws                 0      1024 tuning    0.317
+ 9 1000GP       128      64 ws                 0      2048 tuning    0.317
+10 1000GP       128      64 ws                 0      4096 tuning    0.322
+# ℹ 90 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+df.7.2.1000GP %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=CacheSize)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_grid(Scheduler~Batches) +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figurexkloPs.png]]
+
+#+begin_src R :results output :session *R* :exports both
+df.7.2.makespan %>%
+  filter(InputSet == "grch38" & Test == "tuning") %>%
+  print() -> df.7.2.grch38
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 100 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [100]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 grch38       128      64 omp                0       256 tuning     3.52
+ 2 grch38       128      64 omp                0       512 tuning     3.54
+ 3 grch38       128      64 omp                0      1024 tuning     3.58
+ 4 grch38       128      64 omp                0      2048 tuning     3.68
+ 5 grch38       128      64 omp                0      4096 tuning     3.50
+ 6 grch38       128      64 ws                 0       256 tuning     4.10
+ 7 grch38       128      64 ws                 0       512 tuning     3.92
+ 8 grch38       128      64 ws                 0      1024 tuning     3.91
+ 9 grch38       128      64 ws                 0      2048 tuning     3.87
+10 grch38       128      64 ws                 0      4096 tuning     3.88
+# ℹ 90 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+df.7.2.grch38 %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=CacheSize)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_grid(Scheduler~Batches) +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figureSEgUYj.png]]
+#+begin_src R :results output :session *R* :exports both
+df.7.2.makespan %>%
+  filter(Test != "tuning") %>%
+  mutate(Machine = "amd") %>%
+  mutate(Execution = case_when((Batches == 512 & Threads == 128 & Scheduler == "omp" & CacheSize == 256) ~ "Original",
+                               TRUE ~ "Tunned")
+         ) %>%
+  write_csv("iiswc25/tuning-results-amd.csv") %>%
+  print() -> df.7.2.full
+#+end_src
+
+#+RESULTS:
+#+begin_example
+wrote 1.00TB in  0s, 62.60PB/s                                                                                                                          # A tibble: 8 × 10
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [8]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine Execution
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>    <dbl> <chr>   <chr>    
+1 1000GP       512     128 omp                0       256 full      1.64 amd     Original 
+2 1000GP       512     128 omp                0      2048 full      1.58 amd     Tunned   
+3 chm13        512     128 omp                0       256 full    237.   amd     Original 
+4 chm13       1024     128 omp                0      4096 full    224.   amd     Tunned   
+5 grch38       128     128 omp                0      4096 full     23.4  amd     Tunned   
+6 grch38       512     128 omp                0       256 full     23.8  amd     Original 
+7 yeast        128     128 omp                0       512 full     42.5  amd     Tunned   
+8 yeast        512     128 omp                0       256 full     42.5  amd     Original
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.2.makespan %>%
+  ungroup() %>%
+  group_by(InputSet, Threads) %>%
+  filter(Makespan == min(Makespan),
+         Threads != 72) %>%
+  mutate(Setting = "tuned") %>%
+  print() -> df.7.2.best
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 9
+# Groups:   InputSet, Threads [8]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>  
+1 1000GP       256      64 omp                0       512 tuning    0.258 tuned  
+2 1000GP       512     128 omp                0      2048 tuning    0.193 tuned  
+3 chm13       1024      64 omp                0      2048 tuning   33.8   tuned  
+4 chm13       1024     128 omp                0      4096 tuning   22.5   tuned  
+5 grch38       128      64 omp                0      4096 tuning    3.50  tuned  
+6 grch38       128     128 omp                0      4096 tuning    2.53  tuned  
+7 yeast        128      64 omp                0      2048 tuning    5.02  tuned  
+8 yeast        128     128 omp                0       512 tuning    4.18  tuned
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.2.makespan %>%
+  ungroup() %>%
+  group_by(InputSet, Threads) %>%
+  filter(Batches == 512 & Scheduler == "omp" & CacheSize == 256 & Test == "tuning") %>%
+  mutate(Setting = "original") %>%
+  print() -> df.7.2.original
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 9
+# Groups:   InputSet, Threads [8]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
+1 1000GP       512      64 omp                0       256 tuning    0.300 original
+2 1000GP       512     128 omp                0       256 tuning    0.222 original
+3 chm13        512      64 omp                0       256 tuning   35.8   original
+4 chm13        512     128 omp                0       256 tuning   24.0   original
+5 grch38       512      64 omp                0       256 tuning    3.96  original
+6 grch38       512     128 omp                0       256 tuning    2.92  original
+7 yeast        512      64 omp                0       256 tuning    5.08  original
+8 yeast        512     128 omp                0       256 tuning    4.24  original
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.2.original %>%
+  bind_rows(df.7.2.best) %>%
+  print() -> df.7.2.compare
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 16 × 9
+# Groups:   InputSet, Threads [8]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
+ 1 1000GP       512      64 omp                0       256 tuning    0.300 original
+ 2 1000GP       512     128 omp                0       256 tuning    0.222 original
+ 3 chm13        512      64 omp                0       256 tuning   35.8   original
+ 4 chm13        512     128 omp                0       256 tuning   24.0   original
+ 5 grch38       512      64 omp                0       256 tuning    3.96  original
+ 6 grch38       512     128 omp                0       256 tuning    2.92  original
+ 7 yeast        512      64 omp                0       256 tuning    5.08  original
+ 8 yeast        512     128 omp                0       256 tuning    4.24  original
+ 9 1000GP       256      64 omp                0       512 tuning    0.258 tuned   
+10 1000GP       512     128 omp                0      2048 tuning    0.193 tuned   
+11 chm13       1024      64 omp                0      2048 tuning   33.8   tuned   
+12 chm13       1024     128 omp                0      4096 tuning   22.5   tuned   
+13 grch38       128      64 omp                0      4096 tuning    3.50  tuned   
+14 grch38       128     128 omp                0      4096 tuning    2.53  tuned   
+15 yeast        128      64 omp                0      2048 tuning    5.02  tuned   
+16 yeast        128     128 omp                0       512 tuning    4.18  tuned
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+improvement.7.2 <- df.7.2.compare %>%
+  
+  # 1. Select only the columns needed for this operation.
+  # This defines the "key" (InputSet, Threads) for pairing and the values to reshape.
+  select(InputSet, Threads, Setting, Makespan) %>%
+  
+  # 2. Reshape the data from a "long" to a "wide" format.
+  # This creates separate columns for 'original' and 'tuned' Makespan values.
+  pivot_wider(
+    names_from = Setting,
+    values_from = Makespan
+  ) %>%
+  
+  # 3. Remove rows where a pair could not be found 
+  # (e.g., an 'original' without a 'tuned' counterpart).
+  filter(!is.na(original) & !is.na(tuned)) %>%
+  
+  # 4. Calculate the percentage improvement.
+  # Formula: ((Original - Tuned) / Original) * 100
+  mutate(
+    Percent = ((original - tuned) / original) * 100
+  )
+
+# Print the resulting dataframe to see the output
+print(improvement.7.2)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 5
+# Groups:   InputSet, Threads [8]
+  InputSet Threads original  tuned Percent
+  <chr>      <int>    <dbl>  <dbl>   <dbl>
+1 1000GP        64    0.300  0.258   14.0 
+2 1000GP       128    0.222  0.193   12.8 
+3 chm13         64   35.8   33.8      5.62
+4 chm13        128   24.0   22.5      6.19
+5 grch38        64    3.96   3.50    11.7 
+6 grch38       128    2.92   2.53    13.5 
+7 yeast         64    5.08   5.02     1.26
+8 yeast        128    4.24   4.18     1.47
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.2.compare %>%
+  left_join(improvement.7.2, by=c("InputSet", "Threads")) %>%
+  select(-original, -tuned) %>%
+  write_csv("./iiswc25/best_results_tuning_amd.csv") %>%
+  print() -> df.7.2.compare
+#+end_src
+
+#+RESULTS:
+#+begin_example
+wrote 1.00TB in  0s, 61.68PB/s                                                                                                                          # A tibble: 16 × 10
+# Groups:   InputSet, Threads [8]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting  Percent
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>      <dbl>
+ 1 1000GP       512      64 omp                0       256 tuning    0.300 original   14.0 
+ 2 1000GP       512     128 omp                0       256 tuning    0.222 original   12.8 
+ 3 chm13        512      64 omp                0       256 tuning   35.8   original    5.62
+ 4 chm13        512     128 omp                0       256 tuning   24.0   original    6.19
+ 5 grch38       512      64 omp                0       256 tuning    3.96  original   11.7 
+ 6 grch38       512     128 omp                0       256 tuning    2.92  original   13.5 
+ 7 yeast        512      64 omp                0       256 tuning    5.08  original    1.26
+ 8 yeast        512     128 omp                0       256 tuning    4.24  original    1.47
+ 9 1000GP       256      64 omp                0       512 tuning    0.258 tuned      14.0 
+10 1000GP       512     128 omp                0      2048 tuning    0.193 tuned      12.8 
+11 chm13       1024      64 omp                0      2048 tuning   33.8   tuned       5.62
+12 chm13       1024     128 omp                0      4096 tuning   22.5   tuned       6.19
+13 grch38       128      64 omp                0      4096 tuning    3.50  tuned      11.7 
+14 grch38       128     128 omp                0      4096 tuning    2.53  tuned      13.5 
+15 yeast        128      64 omp                0      2048 tuning    5.02  tuned       1.26
+16 yeast        128     128 omp                0       512 tuning    4.18  tuned       1.47
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+dodge_width <- 0.9
+df.7.2.compare %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=Setting)) +
+  geom_bar(stat = "identity", width = 0.8, position = "dodge") +
+  # Text annotation layer
+  geom_text(
+    # This is the key part:
+    # We filter the data for this layer to only include 'original' executions
+    # that have a percentage greater than 0.
+    data = . %>% filter(Setting == 'original', !is.na(Percent)),
+      # Define the aesthetics for the label.
+    # We format the 'Percent' column to one decimal place and add a '%' sign.
+    aes(label = paste0(round(Percent, 1), "%")),
+    
+    # Dodge the text to align with the corresponding bars.
+    # It's crucial that this matches the bar's dodge width.
+    position = position_dodge(width = 0.9),
+    
+    # Adjust the vertical position to be slightly above the bar.
+    vjust = 1.5,
+    
+    # Set the font size for readability.
+    size = 6
+  ) +
+  facet_wrap(~InputSet, scales="free") +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figureN7DBWe.png]]
+
+
+** 7.3 - Tuning on intel-chameleon
+*** 1000GP
+Ran on Jun 4
+*** Yeast
+Ran on June 8
+*** Grch38
+*** Chm13
+Running on June 8
+*** Analysis
+Group reading data
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             skip = 1,
+             progress=FALSE,
+             col_names=FALSE,
+             col_types=cols()) %>%
+        rename(Query = X1, Runtime = X2, Thread = X3)
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="csv",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 406 × 1
+   SOURCE                                                                                                                
+   <chr>                                                                                                                 
+ 1 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning/1000GP/1024_160_omp_0_tuning_1024.csv
+ 2 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning/1000GP/1024_160_omp_0_tuning_2048.csv
+ 3 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning/1000GP/1024_160_omp_0_tuning_256.csv 
+ 4 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning/1000GP/1024_160_omp_0_tuning_4096.csv
+ 5 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning/1000GP/1024_160_omp_0_tuning_512.csv 
+ 6 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning/1000GP/1024_160_ws_0_tuning_1024.csv 
+ 7 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning/1000GP/1024_160_ws_0_tuning_2048.csv 
+ 8 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning/1000GP/1024_160_ws_0_tuning_256.csv  
+ 9 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning/1000GP/1024_160_ws_0_tuning_4096.csv 
+10 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8380cpu@230ghz/tuning/1000GP/1024_160_ws_0_tuning_512.csv  
+# ℹ 396 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "InputSet", "EXP"), sep="/") %>%
+    separate(EXP, c("Batches", "Threads", "Scheduler", "Repetition", "Test", "CacheSize"), sep="_") %>%
+    mutate(CacheSize = str_replace_all(CacheSize, "([.csv])", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    #mutate(CacheSize = ifelse(CacheSize == "NC", "0", CacheSize)) %>%
+    mutate(Batches = as.integer(Batches),
+           Threads = as.integer(Threads),
+           Repetition = as.integer(Repetition),
+           CacheSize = as.integer(CacheSize)) %>%
+  print() -> df.7.3
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 49,772 × 10
+   InputSet Batches Threads Scheduler Repetition Test   CacheSize Query         Runtime Thread
+   <chr>      <int>   <int> <chr>          <int> <chr>      <int> <chr>           <dbl>  <dbl>
+ 1 1000GP      1024     160 omp                0 tuning      1024 reading-gbz    50.3        0
+ 2 1000GP      1024     160 omp                0 tuning      1024 reading-seeds   1.95       0
+ 3 1000GP      1024     160 omp                0 tuning      1024 seeds-loop      0.258      0
+ 4 1000GP      1024     160 omp                0 tuning      1024 seeds-loop      0.247      1
+ 5 1000GP      1024     160 omp                0 tuning      1024 seeds-loop      0.284      2
+ 6 1000GP      1024     160 omp                0 tuning      1024 seeds-loop      0.295      3
+ 7 1000GP      1024     160 omp                0 tuning      1024 seeds-loop      0.257      4
+ 8 1000GP      1024     160 omp                0 tuning      1024 seeds-loop      0.285      5
+ 9 1000GP      1024     160 omp                0 tuning      1024 seeds-loop      0.253      6
+10 1000GP      1024     160 omp                0 tuning      1024 seeds-loop      0.275      7
+# ℹ 49,762 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+For grouping makespan
+#+begin_src R :results output :session *R* :exports both
+df.7.3 %>%
+  filter(Query == "seeds-loop") %>%
+  group_by(InputSet, Batches, Threads, Scheduler, Repetition, CacheSize, Test) %>%
+  summarize(Makespan = max(Runtime)) %>%
+  print() -> df.7.3.makespan
+#+end_src
+
+#+RESULTS:
+#+begin_example
+`summarise()` has grouped output by 'InputSet', 'Batches', 'Threads', 'Scheduler', 'Repetition', 'CacheSize'. You can
+override using the `.groups` argument.
+# A tibble: 406 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [400]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 1000GP       128      80 omp                0       256 tuning    0.473
+ 2 1000GP       128      80 omp                0       512 tuning    0.487
+ 3 1000GP       128      80 omp                0      1024 tuning    0.488
+ 4 1000GP       128      80 omp                0      2048 tuning    0.522
+ 5 1000GP       128      80 omp                0      4096 tuning    0.428
+ 6 1000GP       128      80 ws                 0       256 tuning    0.517
+ 7 1000GP       128      80 ws                 0       512 tuning    0.536
+ 8 1000GP       128      80 ws                 0      1024 tuning    0.544
+ 9 1000GP       128      80 ws                 0      2048 tuning    0.543
+10 1000GP       128      80 ws                 0      4096 tuning    0.549
+# ℹ 396 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.makespan %>%
+  filter(InputSet == "1000GP" & Test == "tuning") %>%
+  print() -> df.7.3.1000GP
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 100 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [100]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 1000GP       128      80 omp                0       256 tuning    0.473
+ 2 1000GP       128      80 omp                0       512 tuning    0.487
+ 3 1000GP       128      80 omp                0      1024 tuning    0.488
+ 4 1000GP       128      80 omp                0      2048 tuning    0.522
+ 5 1000GP       128      80 omp                0      4096 tuning    0.428
+ 6 1000GP       128      80 ws                 0       256 tuning    0.517
+ 7 1000GP       128      80 ws                 0       512 tuning    0.536
+ 8 1000GP       128      80 ws                 0      1024 tuning    0.544
+ 9 1000GP       128      80 ws                 0      2048 tuning    0.543
+10 1000GP       128      80 ws                 0      4096 tuning    0.549
+# ℹ 90 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+df.7.3.1000GP %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=CacheSize)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_grid(Scheduler~Batches) +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figure1WfLzG.png]]
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.makespan %>%
+  filter(InputSet == "grch38" & Test == "tuning") %>%
+  print() -> df.7.3.grch38
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 100 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [100]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 grch38       128      80 omp                0       256 tuning     5.03
+ 2 grch38       128      80 omp                0       512 tuning     5.12
+ 3 grch38       128      80 omp                0      1024 tuning     4.85
+ 4 grch38       128      80 omp                0      2048 tuning     6.24
+ 5 grch38       128      80 omp                0      4096 tuning     4.80
+ 6 grch38       128      80 ws                 0       256 tuning     7.38
+ 7 grch38       128      80 ws                 0       512 tuning     6.92
+ 8 grch38       128      80 ws                 0      1024 tuning     7.36
+ 9 grch38       128      80 ws                 0      2048 tuning     7.35
+10 grch38       128      80 ws                 0      4096 tuning     7.15
+# ℹ 90 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+df.7.3.grch38 %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=CacheSize)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_grid(Scheduler~Batches) +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figureEXPO5y.png]]
+#+begin_src R :results output :session *R* :exports both
+df.7.3.makespan %>%
+  filter(Test != "tuning") %>%
+  mutate(Machine = "chi-intel") %>%
+  mutate(Execution = case_when((Batches == 512 & Threads == 160 & Scheduler == "omp" & CacheSize == 256) ~ "Original",
+                               TRUE ~ "Tunned")
+         ) %>%
+  write_csv("iiswc25/tuning-results-chi-intel.csv") %>%
+  print() -> df.7.3.full
+#+end_src
+
+#+RESULTS:
+#+begin_example
+wrote 1.00TB in  0s, 67.65PB/s                                                                                                                          # A tibble: 6 × 10
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [6]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine   Execution
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>    <dbl> <chr>     <chr>    
+1 1000GP       128     160 omp                0      2048 full      2.44 chi-intel Tunned   
+2 1000GP       512     160 omp                0       256 full      7.14 chi-intel Original 
+3 grch38       128     160 omp                0      4096 full     39.3  chi-intel Tunned   
+4 grch38       512     160 omp                0       256 full     45.0  chi-intel Original 
+5 yeast        128     160 ws                 0      1024 full     71.0  chi-intel Tunned   
+6 yeast        512     160 omp                0       256 full     72.0  chi-intel Original
+#+end_example
+
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.makespan %>%
+  ungroup() %>%
+  group_by(InputSet, Threads) %>%
+  filter(Makespan == min(Makespan)) %>%
+  mutate(Setting = "tuned") %>%
+  print() -> df.7.3.best
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 9
+# Groups:   InputSet, Threads [8]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>  
+1 1000GP       128     160 omp                0      2048 tuning    0.271 tuned  
+2 1000GP      1024      80 omp                0       256 tuning    0.404 tuned  
+3 chm13        512     160 omp                0      1024 tuning   39.2   tuned  
+4 chm13       1024      80 omp                0      1024 tuning   44.5   tuned  
+5 grch38       128     160 omp                0      4096 tuning    4.19  tuned  
+6 grch38       256      80 omp                0      2048 tuning    4.73  tuned  
+7 yeast        128      80 ws                 0       512 tuning    6.31  tuned  
+8 yeast        128     160 ws                 0      1024 tuning    6.15  tuned
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.makespan %>%
+  ungroup() %>%
+  group_by(InputSet, Threads) %>%
+  filter(Batches == 512 & Scheduler == "omp" & CacheSize == 256 & Test == "tuning") %>%
+  mutate(Setting = "original") %>%
+  print() -> df.7.3.original
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 9
+# Groups:   InputSet, Threads [8]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
+1 1000GP       512      80 omp                0       256 tuning    0.532 original
+2 1000GP       512     160 omp                0       256 tuning    0.354 original
+3 chm13        512      80 omp                0       256 tuning   66.3   original
+4 chm13        512     160 omp                0       256 tuning   66.5   original
+5 grch38       512      80 omp                0       256 tuning    4.90  original
+6 grch38       512     160 omp                0       256 tuning    5.12  original
+7 yeast        512      80 omp                0       256 tuning    9.27  original
+8 yeast        512     160 omp                0       256 tuning    9.71  original
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.original %>%
+  bind_rows(df.7.3.best) %>%
+  print() -> df.7.3.compare
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 16 × 9
+# Groups:   InputSet, Threads [8]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
+ 1 1000GP       512      80 omp                0       256 tuning    0.532 original
+ 2 1000GP       512     160 omp                0       256 tuning    0.354 original
+ 3 chm13        512      80 omp                0       256 tuning   66.3   original
+ 4 chm13        512     160 omp                0       256 tuning   66.5   original
+ 5 grch38       512      80 omp                0       256 tuning    4.90  original
+ 6 grch38       512     160 omp                0       256 tuning    5.12  original
+ 7 yeast        512      80 omp                0       256 tuning    9.27  original
+ 8 yeast        512     160 omp                0       256 tuning    9.71  original
+ 9 1000GP       128     160 omp                0      2048 tuning    0.271 tuned   
+10 1000GP      1024      80 omp                0       256 tuning    0.404 tuned   
+11 chm13        512     160 omp                0      1024 tuning   39.2   tuned   
+12 chm13       1024      80 omp                0      1024 tuning   44.5   tuned   
+13 grch38       128     160 omp                0      4096 tuning    4.19  tuned   
+14 grch38       256      80 omp                0      2048 tuning    4.73  tuned   
+15 yeast        128      80 ws                 0       512 tuning    6.31  tuned   
+16 yeast        128     160 ws                 0      1024 tuning    6.15  tuned
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+improvement.7.3 <- df.7.3.compare %>%
+  
+  # 1. Select only the columns needed for this operation.
+  # This defines the "key" (InputSet, Threads) for pairing and the values to reshape.
+  select(InputSet, Threads, Setting, Makespan) %>%
+  
+  # 2. Reshape the data from a "long" to a "wide" format.
+  # This creates separate columns for 'original' and 'tuned' Makespan values.
+  pivot_wider(
+    names_from = Setting,
+    values_from = Makespan
+  ) %>%
+  
+  # 3. Remove rows where a pair could not be found 
+  # (e.g., an 'original' without a 'tuned' counterpart).
+  filter(!is.na(original) & !is.na(tuned)) %>%
+  
+  # 4. Calculate the percentage improvement.
+  # Formula: ((Original - Tuned) / Original) * 100
+  mutate(
+    Percent = ((original - tuned) / original) * 100
+  )
+
+# Print the resulting dataframe to see the output
+print(improvement.7.3)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 5
+# Groups:   InputSet, Threads [8]
+  InputSet Threads original  tuned Percent
+  <chr>      <int>    <dbl>  <dbl>   <dbl>
+1 1000GP        80    0.532  0.404   24.1 
+2 1000GP       160    0.354  0.271   23.3 
+3 chm13         80   66.3   44.5     32.9 
+4 chm13        160   66.5   39.2     41.0 
+5 grch38        80    4.90   4.73     3.58
+6 grch38       160    5.12   4.19    18.1 
+7 yeast         80    9.27   6.31    31.9 
+8 yeast        160    9.71   6.15    36.6
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.compare %>%
+  left_join(improvement.7.3, by=c("InputSet", "Threads")) %>%
+  select(-original, -tuned) %>%
+  write_csv("./iiswc25/best_results_tuning_chi-intel.csv") %>%
+  print() -> df.7.3.compare
+#+end_src
+
+#+RESULTS:
+#+begin_example
+wrote 1.00TB in  0s, 58.25PB/s                                                                                                                          # A tibble: 16 × 10
+# Groups:   InputSet, Threads [8]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting  Percent
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>      <dbl>
+ 1 1000GP       512      80 omp                0       256 tuning    0.532 original   24.1 
+ 2 1000GP       512     160 omp                0       256 tuning    0.354 original   23.3 
+ 3 chm13        512      80 omp                0       256 tuning   66.3   original   32.9 
+ 4 chm13        512     160 omp                0       256 tuning   66.5   original   41.0 
+ 5 grch38       512      80 omp                0       256 tuning    4.90  original    3.58
+ 6 grch38       512     160 omp                0       256 tuning    5.12  original   18.1 
+ 7 yeast        512      80 omp                0       256 tuning    9.27  original   31.9 
+ 8 yeast        512     160 omp                0       256 tuning    9.71  original   36.6 
+ 9 1000GP       128     160 omp                0      2048 tuning    0.271 tuned      23.3 
+10 1000GP      1024      80 omp                0       256 tuning    0.404 tuned      24.1 
+11 chm13        512     160 omp                0      1024 tuning   39.2   tuned      41.0 
+12 chm13       1024      80 omp                0      1024 tuning   44.5   tuned      32.9 
+13 grch38       128     160 omp                0      4096 tuning    4.19  tuned      18.1 
+14 grch38       256      80 omp                0      2048 tuning    4.73  tuned       3.58
+15 yeast        128      80 ws                 0       512 tuning    6.31  tuned      31.9 
+16 yeast        128     160 ws                 0      1024 tuning    6.15  tuned      36.6
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+dodge_width <- 0.9
+df.7.3.compare %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=Setting)) +
+  geom_bar(stat = "identity", width = 0.8, position = "dodge") +
+  # Text annotation layer
+  geom_text(
+    # This is the key part:
+    # We filter the data for this layer to only include 'original' executions
+    # that have a percentage greater than 0.
+    data = . %>% filter(Setting == 'original', !is.na(Percent)),
+      # Define the aesthetics for the label.
+    # We format the 'Percent' column to one decimal place and add a '%' sign.
+    aes(label = paste0(round(Percent, 1), "%")),
+    
+    # Dodge the text to align with the corresponding bars.
+    # It's crucial that this matches the bar's dodge width.
+    position = position_dodge(width = 0.9),
+    
+    # Adjust the vertical position to be slightly above the bar.
+    vjust = 1.5,
+    
+    # Set the font size for readability.
+    size = 6
+  ) +
+  facet_wrap(~InputSet, scales="free") +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figuredrHIFF.png]]
+
+** 7.4 - Tuning on chi-arm
+*** 1000GP
+Ran on Jun 4
+*** Yeast
+Ran on June 8
+*** Grch38
+*** Chm13
+Running on June 8
+*** Analysis
+Group reading data
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             skip = 1,
+             progress=FALSE,
+             col_names=FALSE,
+             col_types=cols()) %>%
+        rename(Query = X1, Runtime = X2, Thread = X3)
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="csv",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 206 × 1
+   SOURCE                                                                                             
+   <chr>                                                                                              
+ 1 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning/1000GP/1024_64_omp_0_tuning_1024.csv
+ 2 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning/1000GP/1024_64_omp_0_tuning_2048.csv
+ 3 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning/1000GP/1024_64_omp_0_tuning_256.csv 
+ 4 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning/1000GP/1024_64_omp_0_tuning_4096.csv
+ 5 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning/1000GP/1024_64_omp_0_tuning_512.csv 
+ 6 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning/1000GP/1024_64_ws_0_tuning_1024.csv 
+ 7 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning/1000GP/1024_64_ws_0_tuning_2048.csv 
+ 8 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning/1000GP/1024_64_ws_0_tuning_256.csv  
+ 9 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning/1000GP/1024_64_ws_0_tuning_4096.csv 
+10 /soe/jessicadagostini/miniGiraffe/iiswc25/thunderx299xx/tuning/1000GP/1024_64_ws_0_tuning_512.csv  
+# ℹ 196 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "InputSet", "EXP"), sep="/") %>%
+    separate(EXP, c("Batches", "Threads", "Scheduler", "Repetition", "Test", "CacheSize"), sep="_") %>%
+    mutate(CacheSize = str_replace_all(CacheSize, "([.csv])", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    #mutate(CacheSize = ifelse(CacheSize == "NC", "0", CacheSize)) %>%
+    mutate(Batches = as.integer(Batches),
+           Threads = as.integer(Threads),
+           Repetition = as.integer(Repetition),
+           CacheSize = as.integer(CacheSize)) %>%
+  print() -> df.7.4
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 13,596 × 10
+   InputSet Batches Threads Scheduler Repetition Test   CacheSize Query         Runtime Thread
+   <chr>      <int>   <int> <chr>          <int> <chr>      <int> <chr>           <dbl>  <dbl>
+ 1 1000GP      1024      64 omp                0 tuning      1024 reading-gbz    120.        0
+ 2 1000GP      1024      64 omp                0 tuning      1024 reading-seeds    3.40      0
+ 3 1000GP      1024      64 omp                0 tuning      1024 seeds-loop       1.63      0
+ 4 1000GP      1024      64 omp                0 tuning      1024 seeds-loop       1.63      1
+ 5 1000GP      1024      64 omp                0 tuning      1024 seeds-loop       1.63      2
+ 6 1000GP      1024      64 omp                0 tuning      1024 seeds-loop       1.62      3
+ 7 1000GP      1024      64 omp                0 tuning      1024 seeds-loop       1.63      4
+ 8 1000GP      1024      64 omp                0 tuning      1024 seeds-loop       1.62      5
+ 9 1000GP      1024      64 omp                0 tuning      1024 seeds-loop       1.60      6
+10 1000GP      1024      64 omp                0 tuning      1024 seeds-loop       1.62      7
+# ℹ 13,586 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+For grouping makespan
+#+begin_src R :results output :session *R* :exports both
+df.7.4 %>%
+  filter(Query == "seeds-loop") %>%
+  group_by(InputSet, Batches, Threads, Scheduler, Repetition, CacheSize, Test) %>%
+  summarize(Makespan = max(Runtime)) %>%
+  print() -> df.7.4.makespan
+#+end_src
+
+#+RESULTS:
+#+begin_example
+`summarise()` has grouped output by 'InputSet', 'Batches', 'Threads', 'Scheduler', 'Repetition', 'CacheSize'. You can
+override using the `.groups` argument.
+# A tibble: 206 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [200]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 1000GP       128      64 omp                0       256 tuning     3.29
+ 2 1000GP       128      64 omp                0       512 tuning     2.49
+ 3 1000GP       128      64 omp                0      1024 tuning     1.63
+ 4 1000GP       128      64 omp                0      2048 tuning     1.03
+ 5 1000GP       128      64 omp                0      4096 tuning     1.16
+ 6 1000GP       128      64 ws                 0       256 tuning     2.59
+ 7 1000GP       128      64 ws                 0       512 tuning     2.81
+ 8 1000GP       128      64 ws                 0      1024 tuning     2.00
+ 9 1000GP       128      64 ws                 0      2048 tuning     1.42
+10 1000GP       128      64 ws                 0      4096 tuning     1.40
+# ℹ 196 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.4.makespan %>%
+  filter(InputSet == "1000GP" & Test == "tuning") %>%
+  print() -> df.7.4.1000GP
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 50 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [50]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 1000GP       128      64 omp                0       256 tuning     3.29
+ 2 1000GP       128      64 omp                0       512 tuning     2.49
+ 3 1000GP       128      64 omp                0      1024 tuning     1.63
+ 4 1000GP       128      64 omp                0      2048 tuning     1.03
+ 5 1000GP       128      64 omp                0      4096 tuning     1.16
+ 6 1000GP       128      64 ws                 0       256 tuning     2.59
+ 7 1000GP       128      64 ws                 0       512 tuning     2.81
+ 8 1000GP       128      64 ws                 0      1024 tuning     2.00
+ 9 1000GP       128      64 ws                 0      2048 tuning     1.42
+10 1000GP       128      64 ws                 0      4096 tuning     1.40
+# ℹ 40 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+df.7.4.1000GP %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=CacheSize)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_grid(Scheduler~Batches) +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-6kpow7/figureA8Zg1q.png]]
+
+#+begin_src R :results output :session *R* :exports both
+df.7.4.makespan %>%
+  filter(InputSet == "grch38" & Test == "tuning") %>%
+  print() -> df.7.4.grch38
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 50 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [50]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
+ 1 grch38       128      64 omp                0       256 tuning    13.5 
+ 2 grch38       128      64 omp                0       512 tuning     9.73
+ 3 grch38       128      64 omp                0      1024 tuning    10.9 
+ 4 grch38       128      64 omp                0      2048 tuning    10.8 
+ 5 grch38       128      64 omp                0      4096 tuning    10.6 
+ 6 grch38       128      64 ws                 0       256 tuning    12.9 
+ 7 grch38       128      64 ws                 0       512 tuning    11.8 
+ 8 grch38       128      64 ws                 0      1024 tuning    10.7 
+ 9 grch38       128      64 ws                 0      2048 tuning    10.3 
+10 grch38       128      64 ws                 0      4096 tuning    10.2 
+# ℹ 40 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+df.7.3.grch38 %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=CacheSize)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_grid(Scheduler~Batches) +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-m6pXWy/figureEXPO5y.png]]
+#+begin_src R :results output :session *R* :exports both
+df.7.4.makespan %>%
+  filter(Test != "tuning") %>%
+  mutate(Machine = "chi-arm") %>%
+  mutate(Execution = case_when((Batches == 512 & Threads == 64 & Scheduler == "omp" & CacheSize == 256) ~ "Original",
+                               TRUE ~ "Tunned")
+         ) %>%
+  write_csv("iiswc25/tuning-results-chi-arm.csv") %>%
+  print() -> df.7.4.full
+#+end_src
+
+#+RESULTS:
+#+begin_example
+wrote 1.00TB in  0s, 20.36PB/s                                                                                                                          # A tibble: 6 × 10
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [6]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine Execution
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>    <dbl> <chr>   <chr>    
+1 1000GP       256      64 omp                0      4096 full      7.80 chi-arm Tunned   
+2 1000GP       512      64 omp                0       256 full     11.4  chi-arm Original 
+3 grch38       256      64 omp                0       256 full     98.1  chi-arm Tunned   
+4 grch38      2048      64 ws                 0      4096 full     96.6  chi-arm Tunned   
+5 yeast        256      64 ws                 0      1024 full    135.   chi-arm Tunned   
+6 yeast        512      64 omp                0       256 full    138.   chi-arm Original
+#+end_example
+
+
+#+begin_src R :results output :session *R* :exports both
+df.7.4.makespan %>%
+  ungroup() %>%
+  group_by(InputSet, Threads) %>%
+  filter(Makespan == min(Makespan)) %>%
+  mutate(Setting = "tuned") %>%
+  print() -> df.7.4.best
+#+end_src
+
+#+RESULTS:
+: # A tibble: 4 × 9
+: # Groups:   InputSet, Threads [4]
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>  
+: 1 1000GP       256      64 omp                0      4096 tuning    0.990 tuned  
+: 2 chm13       1024      64 ws                 0      2048 tuning   93.7   tuned  
+: 3 grch38       512      64 ws                 0       256 tuning    9.37  tuned  
+: 4 yeast        256      64 ws                 0      1024 tuning   13.3   tuned
+
+#+begin_src R :results output :session *R* :exports both
+df.7.4.makespan %>%
+  ungroup() %>%
+  group_by(InputSet, Threads) %>%
+  filter(Batches == 512 & Scheduler == "omp" & CacheSize == 256 & Test == "tuning") %>%
+  mutate(Setting = "original") %>%
+  print() -> df.7.4.original
+#+end_src
+
+#+RESULTS:
+: # A tibble: 4 × 9
+: # Groups:   InputSet, Threads [4]
+:   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
+:   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
+: 1 1000GP       512      64 omp                0       256 tuning     3.29 original
+: 2 chm13        512      64 omp                0       256 tuning    99.8  original
+: 3 grch38       512      64 omp                0       256 tuning    10.9  original
+: 4 yeast        512      64 omp                0       256 tuning    13.5  original
+
+#+begin_src R :results output :session *R* :exports both
+df.7.4.original %>%
+  bind_rows(df.7.4.best) %>%
+  print() -> df.7.4.compare
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 9
+# Groups:   InputSet, Threads [4]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
+1 1000GP       512      64 omp                0       256 tuning    3.29  original
+2 chm13        512      64 omp                0       256 tuning   99.8   original
+3 grch38       512      64 omp                0       256 tuning   10.9   original
+4 yeast        512      64 omp                0       256 tuning   13.5   original
+5 1000GP       256      64 omp                0      4096 tuning    0.990 tuned   
+6 chm13       1024      64 ws                 0      2048 tuning   93.7   tuned   
+7 grch38       512      64 ws                 0       256 tuning    9.37  tuned   
+8 yeast        256      64 ws                 0      1024 tuning   13.3   tuned
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+improvement.7.4 <- df.7.4.compare %>%
+  
+  # 1. Select only the columns needed for this operation.
+  # This defines the "key" (InputSet, Threads) for pairing and the values to reshape.
+  select(InputSet, Threads, Setting, Makespan) %>%
+  
+  # 2. Reshape the data from a "long" to a "wide" format.
+  # This creates separate columns for 'original' and 'tuned' Makespan values.
+  pivot_wider(
+    names_from = Setting,
+    values_from = Makespan
+  ) %>%
+  
+  # 3. Remove rows where a pair could not be found 
+  # (e.g., an 'original' without a 'tuned' counterpart).
+  filter(!is.na(original) & !is.na(tuned)) %>%
+  
+  # 4. Calculate the percentage improvement.
+  # Formula: ((Original - Tuned) / Original) * 100
+  mutate(
+    Percent = ((original - tuned) / original) * 100
+  )
+
+# Print the resulting dataframe to see the output
+print(improvement.7.4)
+#+end_src
+
+#+RESULTS:
+: # A tibble: 4 × 5
+: # Groups:   InputSet, Threads [4]
+:   InputSet Threads original  tuned Percent
+:   <chr>      <int>    <dbl>  <dbl>   <dbl>
+: 1 1000GP        64     3.29  0.990   69.9 
+: 2 chm13         64    99.8  93.7      6.12
+: 3 grch38        64    10.9   9.37    13.9 
+: 4 yeast         64    13.5  13.3      1.99
+
+#+begin_src R :results output :session *R* :exports both
+df.7.4.compare %>%
+  left_join(improvement.7.4, by=c("InputSet", "Threads")) %>%
+  select(-original, -tuned) %>%
+  write_csv("./iiswc25/best_results_tuning_chi-arm.csv") %>%
+  print() -> df.7.4.compare
+#+end_src
+
+#+RESULTS:
+#+begin_example
+wrote 1.00TB in  0s, 59.07PB/s                                                                                                                          # A tibble: 8 × 10
+# Groups:   InputSet, Threads [4]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting  Percent
+  <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>      <dbl>
+1 1000GP       512      64 omp                0       256 tuning    3.29  original   69.9 
+2 chm13        512      64 omp                0       256 tuning   99.8   original    6.12
+3 grch38       512      64 omp                0       256 tuning   10.9   original   13.9 
+4 yeast        512      64 omp                0       256 tuning   13.5   original    1.99
+5 1000GP       256      64 omp                0      4096 tuning    0.990 tuned      69.9 
+6 chm13       1024      64 ws                 0      2048 tuning   93.7   tuned       6.12
+7 grch38       512      64 ws                 0       256 tuning    9.37  tuned      13.9 
+8 yeast        256      64 ws                 0      1024 tuning   13.3   tuned       1.99
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+dodge_width <- 0.9
+df.7.4.compare %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=Setting)) +
+  geom_bar(stat = "identity", width = 0.8, position = "dodge") +
+  # Text annotation layer
+  geom_text(
+    # This is the key part:
+    # We filter the data for this layer to only include 'original' executions
+    # that have a percentage greater than 0.
+    data = . %>% filter(Setting == 'original', !is.na(Percent)),
+      # Define the aesthetics for the label.
+    # We format the 'Percent' column to one decimal place and add a '%' sign.
+    aes(label = paste0(round(Percent, 1), "%")),
+    
+    # Dodge the text to align with the corresponding bars.
+    # It's crucial that this matches the bar's dodge width.
+    position = position_dodge(width = 0.9),
+    
+    # Adjust the vertical position to be slightly above the bar.
+    vjust = 1.5,
+    
+    # Set the font size for readability.
+    size = 6
+  ) +
+  facet_wrap(~InputSet, scales="free") +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-67x5qJ/figureJo9sOu.png]]
+
+
+
+** Full Analysis
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             progress=FALSE,
+             col_names=TRUE,
+             col_types=cols())
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="tuning-results(.*).csv",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+: # A tibble: 4 × 1
+:   SOURCE                                                                
+:   <chr>                                                                 
+: 1 /soe/jessicadagostini/miniGiraffe/iiswc25/tuning-results-amd.csv      
+: 2 /soe/jessicadagostini/miniGiraffe/iiswc25/tuning-results-chi-arm.csv  
+: 3 /soe/jessicadagostini/miniGiraffe/iiswc25/tuning-results-chi-intel.csv
+: 4 /soe/jessicadagostini/miniGiraffe/iiswc25/tuning-results-intel.csv
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+  mutate(DATA = map(SOURCE, read_traces)) %>%
+  separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6"), sep="/") %>%
+  select(-contains("XX")) %>%
+  unnest(DATA) %>%
+  mutate(Machine = case_when(Machine == "amd" ~ "local-amd",
+                             Machine == "intel" ~ "local-intel",
+                             TRUE ~ Machine),
+         InputSet = case_when(InputSet == "1000GP" ~ "A-human",
+                              InputSet == "yeast" ~ "B-yeast",
+                              InputSet == "chm13" ~ "D-HPRC",
+                              InputSet == "grch38" ~ "C-HPRC")) %>%
+  mutate(Setting = case_when(Execution == "Tunned" ~ "Tuned",
+                             TRUE ~ Execution)) %>%
+ print() -> df.7
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 28 × 11
+   InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine   Execution Setting 
+   <chr>      <dbl>   <dbl> <chr>          <dbl>     <dbl> <chr>    <dbl> <chr>     <chr>     <chr>   
+ 1 A-human      512     128 omp                0       256 full      1.64 local-amd Original  Original
+ 2 A-human      512     128 omp                0      2048 full      1.58 local-amd Tunned    Tuned   
+ 3 D-HPRC       512     128 omp                0       256 full    237.   local-amd Original  Original
+ 4 D-HPRC      1024     128 omp                0      4096 full    224.   local-amd Tunned    Tuned   
+ 5 C-HPRC       128     128 omp                0      4096 full     23.4  local-amd Tunned    Tuned   
+ 6 C-HPRC       512     128 omp                0       256 full     23.8  local-amd Original  Original
+ 7 B-yeast      128     128 omp                0       512 full     42.5  local-amd Tunned    Tuned   
+ 8 B-yeast      512     128 omp                0       256 full     42.5  local-amd Original  Original
+ 9 A-human      256      64 omp                0      4096 full      7.80 chi-arm   Tunned    Tuned   
+10 A-human      512      64 omp                0       256 full     11.4  chi-arm   Original  Original
+# ℹ 18 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+Bar plot
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 800 :height 700 :session *R*
+df.7 %>%
+  mutate(Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=Execution)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_grid(InputSet~Machine, scales="free") +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(angle = 45, hjust = 1, size=15),
+        axis.text.x = element_text(angle = 45, hjust = 1, size=15))
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-67x5qJ/figureMrIJVQ.png]]
+
+#+begin_src R :results output :session *R* :exports both
+df.7 %>%
+  filter(InputSet %in% c("A-human", "D-HPRC"),
+         Machine %in% c("local-amd", "local-intel")) %>%
+  select(-Execution) %>%
+  group_by(InputSet, Machine) %>%
+  arrange(Setting) %>%
+  mutate(Baseline = first(Makespan),
+         Speedup = Baseline/Makespan) %>%
+  print() -> df.7.plot
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 × 12
+# Groups:   InputSet, Machine [4]
+  InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine     Setting  Baseline Speedup
+  <chr>      <dbl>   <dbl> <chr>          <dbl>     <dbl> <chr>    <dbl> <chr>       <chr>       <dbl>   <dbl>
+1 A-human      512     128 omp                0       256 full      1.64 local-amd   Original     1.64   1    
+2 D-HPRC       512     128 omp                0       256 full    237.   local-amd   Original   237.     1    
+3 A-human      512      96 omp                0       256 full     10.3  local-intel Original    10.3    1    
+4 D-HPRC       512      96 omp                0       256 full    675.   local-intel Original   675.     1    
+5 A-human      512     128 omp                0      2048 full      1.58 local-amd   Tuned        1.64   1.03 
+6 D-HPRC      1024     128 omp                0      4096 full    224.   local-amd   Tuned      237.     1.06 
+7 A-human      256      96 omp                0      4096 full      6.96 local-intel Tuned       10.3    1.48 
+8 D-HPRC       128      96 omp                0      2048 full    700.   local-intel Tuned      675.     0.964
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 700 :height 300 :session *R*
+p <- df.7.plot %>%
+  filter(Machine %in% c("local-intel", "local-amd")) %>%
+  ggplot(aes(x=Machine, y=Makespan, fill=Setting)) +
+  geom_bar(stat = "identity", width = 0.8, position = "dodge") +
+  facet_wrap(~InputSet, ncol=2, scales="free") +
+  geom_text(
+    # This is the key part:
+    # We filter the data for this layer to only include 'original' executions
+    # that have a percentage greater than 0.
+    data = . %>% filter(Setting == 'Tuned'),
+      # Define the aesthetics for the label.
+    # We format the 'Percent' column to one decimal place and add a '%' sign.
+    aes(label = paste0(round(Speedup, 2), "x")),
+    
+    # Dodge the text to align with the corresponding bars.
+    # It's crucial that this matches the bar's dodge width.
+    position = position_dodge(width = 0.9),
+    
+    # Adjust the vertical position to be slightly above the bar.
+    vjust = 0.5,
+    
+    # Set the font size for readability.
+    size = 4
+  ) +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 18),
+        axis.text.y = element_text(angle = 45, hjust = 1, size=15),
+        axis.text.x = element_text(angle = 0, hjust = 0.5, size=15))
+p
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-67x5qJ/figurebZoYm9.png]]
+
+#+begin_src R :results graphics file :file ./iiswc25/img/full-size-tuning.pdf :exports both :width 7 :height 3 :session *R*
+p
+#+end_src
+
+#+RESULTS:
+[[file:./iiswc25/img/full-size-tuning.pdf]]
+
+
+#+begin_src R :results output :session *R* :exports both
+improvement_df <- df.7 %>%
+  select(Machine, InputSet, Threads, Execution, Makespan) %>%
+  pivot_wider(
+    names_from = Execution,
+    values_from = Makespan
+  ) %>%
+  filter(!is.na(Original) & !is.na(Tunned)) %>%
+  mutate(
+    # NOTE: Using the formula for *improvement* over original
+    Improvement_Percent = ((Original - Tunned) / Original) * 100
+  ) %>%
+  # Select only the key columns and the result for joining
+  select(Machine, InputSet, Threads, Improvement_Percent) %>%
+  print()
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 13 × 4
+   Machine     InputSet Threads Improvement_Percent
+   <chr>       <chr>      <dbl>               <dbl>
+ 1 amd         1000GP       128               3.14 
+ 2 amd         chm13        128               5.24 
+ 3 amd         grch38       128               1.57 
+ 4 amd         yeast        128               0.120
+ 5 chi-arm     1000GP        64              31.8  
+ 6 chi-arm     yeast         64               2.15 
+ 7 chi-intel   1000GP       160              65.8  
+ 8 chi-intel   grch38       160              12.7  
+ 9 chi-intel   yeast        160               1.41 
+10 local-intel 1000GP        96              32.2  
+11 local-intel chm13         96              -3.71 
+12 local-intel grch38        96              -3.94 
+13 local-intel yeast         96               2.69
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7 %>%
+  left_join(improvement_df, by=c("InputSet", "Threads", "Machine")) %>%
+  #select(-Original, -Tunned) %>%
+  #write_csv("./iiswc25/best_results_tuning_intel.csv") %>%
+  mutate(Improvement_Percent = case_when(Execution == "Original" ~ 0,
+                                         Execution == "Tunned" ~ Improvement_Percent)) %>%
+  select(InputSet, Machine, Batches, Scheduler, CacheSize, Makespan, Execution, Improvement_Percent) %>%
+  arrange(InputSet, Machine) %>%
+  print(n=22) -> df.7.percent
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 26 × 8
+   InputSet Machine     Batches Scheduler CacheSize Makespan Execution Improvement_Percent
+   <chr>    <chr>         <dbl> <chr>         <dbl>    <dbl> <chr>                   <dbl>
+ 1 1000GP   amd             512 omp             256     1.64 Original                0    
+ 2 1000GP   amd             512 omp            2048     1.58 Tunned                  3.14 
+ 3 1000GP   chi-arm         256 omp            4096     7.80 Tunned                 31.8  
+ 4 1000GP   chi-arm         512 omp             256    11.4  Original                0    
+ 5 1000GP   chi-intel       128 omp            2048     2.44 Tunned                 65.8  
+ 6 1000GP   chi-intel       512 omp             256     7.14 Original                0    
+ 7 1000GP   local-intel     256 omp            4096     6.96 Tunned                 32.2  
+ 8 1000GP   local-intel     512 omp             256    10.3  Original                0    
+ 9 chm13    amd             512 omp             256   237.   Original                0    
+10 chm13    amd            1024 omp            4096   224.   Tunned                  5.24 
+11 chm13    local-intel     128 omp            2048   700.   Tunned                 -3.71 
+12 chm13    local-intel     512 omp             256   675.   Original                0    
+13 grch38   amd             128 omp            4096    23.4  Tunned                  1.57 
+14 grch38   amd             512 omp             256    23.8  Original                0    
+15 grch38   chi-intel       128 omp            4096    39.3  Tunned                 12.7  
+16 grch38   chi-intel       512 omp             256    45.0  Original                0    
+17 grch38   local-intel     256 omp            4096    70.6  Tunned                 -3.94 
+18 grch38   local-intel     512 omp             256    67.9  Original                0    
+19 yeast    amd             128 omp             512    42.5  Tunned                  0.120
+20 yeast    amd             512 omp             256    42.5  Original                0    
+21 yeast    chi-arm         256 ws             1024   135.   Tunned                  2.15 
+22 yeast    chi-arm         512 omp             256   138.   Original                0    
+# ℹ 4 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+
+Line plot
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1000 :height 600 :session *R*
+df.5 %>%
+  #filter(Scheduler == "omp") %>%
+  ggplot(aes(x=Threads, y=Speedup, color=InputSet)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous("Threads", breaks=df.5$Threads) +
+  facet_grid(Scheduler~Machine, scales="free_x") +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(angle = 45, hjust = 1, size=15),
+        axis.text.x = element_text(angle = 45, hjust = 1, size=15))
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-6kpow7/figurej7GlUh.png]]
+
+#+begin_src R :results output :session *R* :exports both
+df.5 %>%
+  filter(InputSet == "chm13") %>%
+  arrange(AvgMakespan)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 36 × 8
+   Machine Threads Scheduler CacheSize InputSet AvgMakespan Baseline Speedup
+   <chr>     <dbl> <chr>         <dbl> <chr>          <dbl>    <dbl>   <dbl>
+ 1 amd         128 omp             256 chm13           229.   20355.    88.7
+ 2 amd         128 ws              256 chm13           248.   20453.    82.5
+ 3 amd          96 omp             256 chm13           273.   20355.    74.6
+ 4 amd          96 ws              256 chm13           298.   20453.    68.6
+ 5 amd          72 ws              256 chm13           322.   20453.    63.5
+ 6 amd          72 omp             256 chm13           324.   20355.    62.9
+ 7 amd          64 ws              256 chm13           347.   20453.    59.0
+ 8 amd          64 omp             256 chm13           356.   20355.    57.1
+ 9 amd          32 omp             256 chm13           654.   20355.    31.1
+10 amd          32 ws              256 chm13           681.   20453.    30.0
+# ℹ 26 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+
+** Best tuning analysis
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+  read_csv(file,
+           progress=FALSE,
+           col_names=TRUE,
+           col_types=cols())
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="best",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+: # A tibble: 4 × 1
+:   SOURCE                                                                     
+:   <chr>                                                                      
+: 1 /soe/jessicadagostini/miniGiraffe/iiswc25/best_results_tuning_amd.csv      
+: 2 /soe/jessicadagostini/miniGiraffe/iiswc25/best_results_tuning_chi-arm.csv  
+: 3 /soe/jessicadagostini/miniGiraffe/iiswc25/best_results_tuning_chi-intel.csv
+: 4 /soe/jessicadagostini/miniGiraffe/iiswc25/best_results_tuning_intel.csv
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "EXP"), sep="/") %>%
+    separate(EXP, c("XX5", "XX6", "XX7", "Machine"), sep="_") %>%
+    mutate(Machine = str_replace_all(Machine, "(.csv)", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    mutate(Machine = case_when(Machine == "amd" ~ "local-amd",
+                               Machine == "intel" ~ "local-intel",
+                               TRUE ~ Machine),
+           InputSet = case_when(InputSet == "1000GP" ~ "A-human",
+                                InputSet == "yeast" ~ "B-yeast",
+                                InputSet == "chm13" ~ "D-HPRC",
+                                InputSet == "grch38" ~ "C-HPRC")) %>%
+    print(n=45) -> df.7.compare
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 56 × 11
+   Machine     InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting  Percent
+   <chr>       <chr>      <dbl>   <dbl> <chr>          <dbl>     <dbl> <chr>     <dbl> <chr>      <dbl>
+ 1 local-amd   A-human      512      64 omp                0       256 tuning    0.300 original   14.0 
+ 2 local-amd   A-human      512     128 omp                0       256 tuning    0.222 original   12.8 
+ 3 local-amd   D-HPRC       512      64 omp                0       256 tuning   35.8   original    5.62
+ 4 local-amd   D-HPRC       512     128 omp                0       256 tuning   24.0   original    6.19
+ 5 local-amd   C-HPRC       512      64 omp                0       256 tuning    3.96  original   11.7 
+ 6 local-amd   C-HPRC       512     128 omp                0       256 tuning    2.92  original   13.5 
+ 7 local-amd   B-yeast      512      64 omp                0       256 tuning    5.08  original    1.26
+ 8 local-amd   B-yeast      512     128 omp                0       256 tuning    4.24  original    1.47
+ 9 local-amd   A-human      256      64 omp                0       512 tuning    0.258 tuned      14.0 
+10 local-amd   A-human      512     128 omp                0      2048 tuning    0.193 tuned      12.8 
+11 local-amd   D-HPRC      1024      64 omp                0      2048 tuning   33.8   tuned       5.62
+12 local-amd   D-HPRC      1024     128 omp                0      4096 tuning   22.5   tuned       6.19
+13 local-amd   C-HPRC       128      64 omp                0      4096 tuning    3.50  tuned      11.7 
+14 local-amd   C-HPRC       128     128 omp                0      4096 tuning    2.53  tuned      13.5 
+15 local-amd   B-yeast      128      64 omp                0      2048 tuning    5.02  tuned       1.26
+16 local-amd   B-yeast      128     128 omp                0       512 tuning    4.18  tuned       1.47
+17 chi-arm     A-human      512      64 omp                0       256 tuning    3.29  original   69.9 
+18 chi-arm     D-HPRC       512      64 omp                0       256 tuning   99.8   original    6.12
+19 chi-arm     C-HPRC       512      64 omp                0       256 tuning   10.9   original   13.9 
+20 chi-arm     B-yeast      512      64 omp                0       256 tuning   13.5   original    1.99
+21 chi-arm     A-human      256      64 omp                0      4096 tuning    0.990 tuned      69.9 
+22 chi-arm     D-HPRC      1024      64 ws                 0      2048 tuning   93.7   tuned       6.12
+23 chi-arm     C-HPRC       512      64 ws                 0       256 tuning    9.37  tuned      13.9 
+24 chi-arm     B-yeast      256      64 ws                 0      1024 tuning   13.3   tuned       1.99
+25 chi-intel   A-human      512      80 omp                0       256 tuning    0.532 original   24.1 
+26 chi-intel   A-human      512     160 omp                0       256 tuning    0.354 original   23.3 
+27 chi-intel   D-HPRC       512      80 omp                0       256 tuning   66.3   original   32.9 
+28 chi-intel   D-HPRC       512     160 omp                0       256 tuning   66.5   original   41.0 
+29 chi-intel   C-HPRC       512      80 omp                0       256 tuning    4.90  original    3.58
+30 chi-intel   C-HPRC       512     160 omp                0       256 tuning    5.12  original   18.1 
+31 chi-intel   B-yeast      512      80 omp                0       256 tuning    9.27  original   31.9 
+32 chi-intel   B-yeast      512     160 omp                0       256 tuning    9.71  original   36.6 
+33 chi-intel   A-human      128     160 omp                0      2048 tuning    0.271 tuned      23.3 
+34 chi-intel   A-human     1024      80 omp                0       256 tuning    0.404 tuned      24.1 
+35 chi-intel   D-HPRC       512     160 omp                0      1024 tuning   39.2   tuned      41.0 
+36 chi-intel   D-HPRC      1024      80 omp                0      1024 tuning   44.5   tuned      32.9 
+37 chi-intel   C-HPRC       128     160 omp                0      4096 tuning    4.19  tuned      18.1 
+38 chi-intel   C-HPRC       256      80 omp                0      2048 tuning    4.73  tuned       3.58
+39 chi-intel   B-yeast      128      80 ws                 0       512 tuning    6.31  tuned      31.9 
+40 chi-intel   B-yeast      128     160 ws                 0      1024 tuning    6.15  tuned      36.6 
+41 local-intel A-human      512      48 omp                0       256 tuning    1.08  original   13.6 
+42 local-intel A-human      512      96 omp                0       256 tuning    1.47  original   57.6 
+43 local-intel D-HPRC       512      48 omp                0       256 tuning   52.0   original    6.05
+44 local-intel D-HPRC       512      96 omp                0       256 tuning   40.5   original   14.9 
+45 local-intel C-HPRC       512      48 omp                0       256 tuning   10.9   original   18.9 
+# ℹ 11 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
+dodge_width <- 0.9
+df.7.compare %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=Makespan, fill=Setting)) +
+  geom_bar(stat = "identity", width = 0.8, position = "dodge") +
+  # Text annotation layer
+  geom_text(
+    # This is the key part:
+    # We filter the data for this layer to only include 'original' executions
+    # that have a percentage greater than 0.
+    data = . %>% filter(Setting == 'original', !is.na(Percent)),
+      # Define the aesthetics for the label.
+    # We format the 'Percent' column to one decimal place and add a '%' sign.
+    aes(label = paste0(round(Percent, 1), "%")),
+    
+    # Dodge the text to align with the corresponding bars.
+    # It's crucial that this matches the bar's dodge width.
+    position = position_dodge(width = 0.9),
+    
+    # Adjust the vertical position to be slightly above the bar.
+    vjust = 1.5,
+    
+    # Set the font size for readability.
+    size = 6
+  ) +
+  facet_grid(InputSet~Machine, scales="free") +
+  theme_bw() 
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-kOBy2I/figureN7BYfi.png]]
+#+begin_src R :results output :session *R* :exports both
+df.7.compare %>%
+  filter(Setting == "tuned") %>%
+  select(Machine, InputSet, Batches, Threads, Scheduler, CacheSize, Makespan, Percent) %>%
+  arrange(Machine, InputSet) %>%
+  rename(`% of gain` = Percent) %>%
+  print(n=45)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 28 × 8
+   Machine     InputSet Batches Threads Scheduler CacheSize Makespan `% of gain`
+   <chr>       <chr>      <dbl>   <dbl> <chr>         <dbl>    <dbl>       <dbl>
+ 1 chi-arm     A-human      256      64 omp            4096    0.990       69.9 
+ 2 chi-arm     B-yeast      256      64 ws             1024   13.3          1.99
+ 3 chi-arm     C-HPRC       512      64 ws              256    9.37        13.9 
+ 4 chi-arm     D-HPRC      1024      64 ws             2048   93.7          6.12
+ 5 chi-intel   A-human      128     160 omp            2048    0.271       23.3 
+ 6 chi-intel   A-human     1024      80 omp             256    0.404       24.1 
+ 7 chi-intel   B-yeast      128      80 ws              512    6.31        31.9 
+ 8 chi-intel   B-yeast      128     160 ws             1024    6.15        36.6 
+ 9 chi-intel   C-HPRC       128     160 omp            4096    4.19        18.1 
+10 chi-intel   C-HPRC       256      80 omp            2048    4.73         3.58
+11 chi-intel   D-HPRC       512     160 omp            1024   39.2         41.0 
+12 chi-intel   D-HPRC      1024      80 omp            1024   44.5         32.9 
+13 local-amd   A-human      256      64 omp             512    0.258       14.0 
+14 local-amd   A-human      512     128 omp            2048    0.193       12.8 
+15 local-amd   B-yeast      128      64 omp            2048    5.02         1.26
+16 local-amd   B-yeast      128     128 omp             512    4.18         1.47
+17 local-amd   C-HPRC       128      64 omp            4096    3.50        11.7 
+18 local-amd   C-HPRC       128     128 omp            4096    2.53        13.5 
+19 local-amd   D-HPRC      1024      64 omp            2048   33.8          5.62
+20 local-amd   D-HPRC      1024     128 omp            4096   22.5          6.19
+21 local-intel A-human      256      96 omp            4096    0.623       57.6 
+22 local-intel A-human      512      48 omp            1024    0.936       13.6 
+23 local-intel B-yeast      128      48 omp            4096    5.91        17.7 
+24 local-intel B-yeast      128      96 ws              512    5.49         6.03
+25 local-intel C-HPRC       256      96 omp            4096    8.04        22.5 
+26 local-intel C-HPRC      1024      48 omp             128    8.86        18.9 
+27 local-intel D-HPRC       128      96 omp            2048   34.5         14.9 
+28 local-intel D-HPRC      2048      48 omp            4096   48.8          6.05
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.compare %>%
+  group_by(Machine, InputSet) %>%
+  filter(Threads == max(Threads)) %>%
+  arrange(Setting) %>%
+  mutate(Baseline = first(Makespan),
+         Speedup = Baseline/Makespan) %>%
+  ungroup() %>%
+  #group_by(InputSet) %>%
+  mutate(GeoMean = exp(mean(log(Speedup)))) %>%
+  print(n=24) -> df.7.speedup
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 32 × 14
+   Machine   InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Setting Percent Baseline Speedup GeoMean
+   <chr>     <chr>      <dbl>   <dbl> <chr>          <dbl>     <dbl> <chr>    <dbl> <chr>     <dbl>    <dbl>   <dbl>   <dbl>
+ 1 local-amd A-human      512     128 omp                0       256 tuni…    0.222 origin…   12.8     0.222    1       1.15
+ 2 local-amd D-HPRC       512     128 omp                0       256 tuni…   24.0   origin…    6.19   24.0      1       1.15
+ 3 local-amd C-HPRC       512     128 omp                0       256 tuni…    2.92  origin…   13.5     2.92     1       1.15
+ 4 local-amd B-yeast      512     128 omp                0       256 tuni…    4.24  origin…    1.47    4.24     1       1.15
+ 5 chi-arm   A-human      512      64 omp                0       256 tuni…    3.29  origin…   69.9     3.29     1       1.15
+ 6 chi-arm   D-HPRC       512      64 omp                0       256 tuni…   99.8   origin…    6.12   99.8      1       1.15
+ 7 chi-arm   C-HPRC       512      64 omp                0       256 tuni…   10.9   origin…   13.9    10.9      1       1.15
+ 8 chi-arm   B-yeast      512      64 omp                0       256 tuni…   13.5   origin…    1.99   13.5      1       1.15
+ 9 chi-intel A-human      512     160 omp                0       256 tuni…    0.354 origin…   23.3     0.354    1       1.15
+10 chi-intel D-HPRC       512     160 omp                0       256 tuni…   66.5   origin…   41.0    66.5      1       1.15
+11 chi-intel C-HPRC       512     160 omp                0       256 tuni…    5.12  origin…   18.1     5.12     1       1.15
+12 chi-intel B-yeast      512     160 omp                0       256 tuni…    9.71  origin…   36.6     9.71     1       1.15
+13 local-in… A-human      512      96 omp                0       256 tuni…    1.47  origin…   57.6     1.47     1       1.15
+14 local-in… D-HPRC       512      96 omp                0       256 tuni…   40.5   origin…   14.9    40.5      1       1.15
+15 local-in… C-HPRC       512      96 omp                0       256 tuni…   10.4   origin…   22.5    10.4      1       1.15
+16 local-in… B-yeast      512      96 omp                0       256 tuni…    5.84  origin…    6.03    5.84     1       1.15
+17 local-amd A-human      512     128 omp                0      2048 tuni…    0.193 tuned     12.8     0.222    1.15    1.15
+18 local-amd D-HPRC      1024     128 omp                0      4096 tuni…   22.5   tuned      6.19   24.0      1.07    1.15
+19 local-amd C-HPRC       128     128 omp                0      4096 tuni…    2.53  tuned     13.5     2.92     1.16    1.15
+20 local-amd B-yeast      128     128 omp                0       512 tuni…    4.18  tuned      1.47    4.24     1.01    1.15
+21 chi-arm   A-human      256      64 omp                0      4096 tuni…    0.990 tuned     69.9     3.29     3.32    1.15
+22 chi-arm   D-HPRC      1024      64 ws                 0      2048 tuni…   93.7   tuned      6.12   99.8      1.07    1.15
+23 chi-arm   C-HPRC       512      64 ws                 0       256 tuni…    9.37  tuned     13.9    10.9      1.16    1.15
+24 chi-arm   B-yeast      256      64 ws                 0      1024 tuni…   13.3   tuned      1.99   13.5      1.02    1.15
+# ℹ 8 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.speedup %>%
+  filter(Setting == "tuned") %>%
+  select(Machine, InputSet, Batches, Scheduler, CacheSize)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 16 × 5
+# Groups:   InputSet [4]
+   Machine     InputSet Batches Scheduler CacheSize
+   <chr>       <chr>      <dbl> <chr>         <dbl>
+ 1 local-amd   A-human      512 omp            2048
+ 2 local-amd   D-HPRC      1024 omp            4096
+ 3 local-amd   C-HPRC       128 omp            4096
+ 4 local-amd   B-yeast      128 omp             512
+ 5 chi-arm     A-human      256 omp            4096
+ 6 chi-arm     D-HPRC      1024 ws             2048
+ 7 chi-arm     C-HPRC       512 ws              256
+ 8 chi-arm     B-yeast      256 ws             1024
+ 9 chi-intel   A-human      128 omp            2048
+10 chi-intel   D-HPRC       512 omp            1024
+11 chi-intel   C-HPRC       128 omp            4096
+12 chi-intel   B-yeast      128 ws             1024
+13 local-intel A-human      256 omp            4096
+14 local-intel D-HPRC       128 omp            2048
+15 local-intel C-HPRC       256 omp            4096
+16 local-intel B-yeast      128 ws              512
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.speedup
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 24 × 14
+# Groups:   InputSet [4]
+   Machine   InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Setting Percent Baseline Speedup GeoMean
+   <chr>     <chr>      <dbl>   <dbl> <chr>          <dbl>     <dbl> <chr>    <dbl> <chr>     <dbl>    <dbl>   <dbl>   <dbl>
+ 1 amd       1000GP       512     128 omp                0       256 tuni…    0.222 origin…   12.8     0.222       1    1.23
+ 2 amd       chm13        512     128 omp                0       256 tuni…   24.0   origin…    6.19   24.0         1    1.13
+ 3 amd       grch38       512     128 omp                0       256 tuni…    2.92  origin…   13.5     2.92        1    1.11
+ 4 amd       yeast        512     128 omp                0       256 tuni…    4.24  origin…    1.47    4.24        1    1.09
+ 5 chi-intel 1000GP       512     160 omp                0       256 tuni…    0.354 origin…   23.3     0.354       1    1.23
+ 6 chi-intel chm13        512     160 omp                0       256 tuni…   66.5   origin…   41.0    66.5         1    1.13
+ 7 chi-intel grch38       512     160 omp                0       256 tuni…    5.12  origin…   18.1     5.12        1    1.11
+ 8 chi-intel yeast        512     160 omp                0       256 tuni…    9.71  origin…   36.6     9.71        1    1.09
+ 9 intel     1000GP       512      96 omp                0       256 tuni…    1.47  origin…   57.6     1.47        1    1.23
+10 intel     chm13        512      96 omp                0       256 tuni…   40.5   origin…   14.9    40.5         1    1.13
+# ℹ 14 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 700 :height 600 :session *R*
+p <- df.7.speedup %>%
+  mutate(Machine = factor(Machine, levels=c("local-intel", "local-amd", "chi-arm", "chi-intel"))) %>%
+  ggplot(aes(x=Machine, y=Makespan, fill=Setting)) +
+  geom_bar(stat = "identity", width = 0.8, position = "dodge") +
+  facet_wrap(~InputSet, ncol=2, scales="free") +
+  #ylim(0, 3) +
+  #ylab("% of gain") +
+    geom_text(
+    # This is the key part:
+    # We filter the data for this layer to only include 'original' executions
+    # that have a percentage greater than 0.
+    data = . %>% filter(Setting == 'tuned', !is.na(Percent)),
+      # Define the aesthetics for the label.
+    # We format the 'Percent' column to one decimal place and add a '%' sign.
+    aes(label = paste0(round(Speedup, 2), "x")),
+    
+    # Dodge the text to align with the corresponding bars.
+    # It's crucial that this matches the bar's dodge width.
+    position = position_dodge(width = 0.9),
+    
+    # Adjust the vertical position to be slightly above the bar.
+    vjust = 0.7,
+    
+    # Set the font size for readability.
+    size = 4
+  ) +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 18),
+        axis.text.y = element_text(angle = 45, hjust = 1, size=15),
+        axis.text.x = element_text(angle = 15, hjust = 0.5, size=15))
+p
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-67x5qJ/figure8Wp6gR.png]]
+
+#+begin_src R :results graphics file :file ./iiswc25/img/auto-tuning-results.pdf :exports both :width 7 :height 6.5 :session *R*
+p
+#+end_src
+
+#+RESULTS:
+[[file:./iiswc25/img/auto-tuning-results.pdf]]
+
+#+begin_src R :results output :session *R* :exports both
+df.7.speedup %>%
+  filter(InputSet == "chm13") %>%
+  arrange(Makespan) %>%
+  print(n=24)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 6 × 14
+# Groups:   InputSet [1]
+  Machine   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting Percent Baseline Speedup GeoMean
+  <chr>     <chr>      <dbl>   <dbl> <chr>          <dbl>     <dbl> <chr>     <dbl> <chr>     <dbl>    <dbl>   <dbl>   <dbl>
+1 amd       chm13       1024     128 omp                0      4096 tuning     22.5 tuned      6.19     24.0    1.07    1.13
+2 amd       chm13        512     128 omp                0       256 tuning     24.0 origin…    6.19     24.0    1       1.13
+3 intel     chm13        128      96 omp                0      2048 tuning     34.5 tuned     14.9      40.5    1.17    1.13
+4 chi-intel chm13        512     160 omp                0      1024 tuning     39.2 tuned     41.0      66.5    1.70    1.13
+5 intel     chm13        512      96 omp                0       256 tuning     40.5 origin…   14.9      40.5    1       1.13
+6 chi-intel chm13        512     160 omp                0       256 tuning     66.5 origin…   41.0      66.5    1       1.13
+#+end_example
+
+** Trying best tuning on full Giraffe
+#+begin_src shell :results output :exports both
+#!/bin/bash
+EXP=iiswc25-7-tuned
+
+cd /lscratch/jessicadagostini
+
+echo "Running $EXP"
+/soe/jessicadagostini/vg-proxy/bin/vg-times-4096 giraffe \
+    -Z 1000GP/1000GPlons_hs38d1_filter.giraffe.gbz \
+    -m 1000GP/1000GPlons_hs38d1_filter.min \
+    -d 1000GP/1000GPlons_hs38d1_filter.dist \
+    -f 1000GP/novaseq6000-ERR3239454-shuffled-1m.fq.gz \
+    -B 256 -b default -t $1 -p --track-correctness > test.gamcd 2>tmp-$EXP.csv
+
+cat tmp-$EXP.csv | grep "total_" > $EXP.csv
+gzip tmp-$EXP.csv
+gzip $EXP.csv
+cp $EXP.csv.gz /soe/jessicadagostini/miniGiraffe/iiswc25/.
+rm test.gamcd
+rm $EXP.csv.gz
+#+end_src
+
+I have results, they are on intelxeonplatinum8260cpu@240ghz/7
+
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+    read_csv(file,
+             progress=FALSE,
+             col_names=FALSE,
+             col_types=cols()) %>%
+        rename(Query = X1, Start = X2, End = X3, Thread = X4)
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="giraffe",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+: # A tibble: 6 × 1
+:   SOURCE                                                                                               
+:   <chr>                                                                                                
+: 1 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7/96_1_original_giraffe.csv
+: 2 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7/96_1_tuned_giraffe.csv   
+: 3 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7/96_2_original_giraffe.csv
+: 4 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7/96_2_tuned_giraffe.csv   
+: 5 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7/96_3_original_giraffe.csv
+: 6 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7/96_3_tuned_giraffe.csv
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "EXP"), sep="/") %>%
+    separate(EXP, c("Threads", "Repetition", "Setting", "XX8"), sep="_") %>%
+    #mutate(CacheSize = str_replace_all(CacheSize, "([minGrafe.csv])", "")) %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    #mutate(CacheSize = ifelse(CacheSize == "NC", "0", CacheSize)) %>%
+    #mutate(Batches = as.integer(Batches),
+    #       Threads = as.integer(Threads),
+    #       Repetition = as.integer(Repetition),
+    #       CacheSize = as.integer(CacheSize)) %>%
+  print() -> df.7
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 74,234,208 × 7
+   Threads Repetition Setting  Query               Start       End Thread
+   <chr>   <chr>      <chr>    <chr>               <dbl>     <dbl>  <dbl>
+ 1 96      1          original total_extension 13676527. 13676527.     36
+ 2 96      1          original total_extension 13676527. 13676527.     36
+ 3 96      1          original total_extension 13676527. 13676527.     36
+ 4 96      1          original total_extension 13676527. 13676527.     73
+ 5 96      1          original total_extension 13676527. 13676527.     36
+ 6 96      1          original total_extension 13676527. 13676527.     73
+ 7 96      1          original total_extension 13676527. 13676527.     36
+ 8 96      1          original total_extension 13676527. 13676527.     36
+ 9 96      1          original total_extension 13676527. 13676527.     73
+10 96      1          original total_extension 13676527. 13676527.     73
+# ℹ 74,234,198 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7 %>%
+  mutate(Duration = End - Start) %>%
+  group_by(Repetition, Setting, Thread, Query) %>%
+  summarize(Runtime = sum(Duration)) %>%
+  print() -> df.7.runtime
+#+end_src
+
+#+RESULTS:
+#+begin_example
+`summarise()` has grouped output by 'Repetition', 'Setting', 'Thread'. You can override using the `.groups` argument.
+# A tibble: 582 × 5
+# Groups:   Repetition, Setting, Thread [576]
+   Repetition Setting  Thread Query           Runtime
+   <chr>      <chr>     <dbl> <chr>             <dbl>
+ 1 1          original      0 total_extension    4.20
+ 2 1          original      0 total_main       132.  
+ 3 1          original      1 total_extension    3.83
+ 4 1          original      2 total_extension    4.28
+ 5 1          original      3 total_extension    4.13
+ 6 1          original      4 total_extension    3.84
+ 7 1          original      5 total_extension    4.13
+ 8 1          original      6 total_extension    4.14
+ 9 1          original      7 total_extension    3.96
+10 1          original      8 total_extension    4.25
+# ℹ 572 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+For grouping makespan
+#+begin_src R :results output :session *R* :exports both
+df.7.runtime %>%
+  filter(Query == "total_extension") %>%
+  group_by(Repetition, Setting) %>%
+  summarize(Makespan = max(Runtime)) %>%
+  ungroup() %>%
+  group_by(Setting) %>%
+  summarize(AvgMakespan = mean(Makespan),
+            MedianMakespan = median(Makespan)) %>%
+  print() -> df.7.makespan
+#+end_src
+
+#+RESULTS:
+: `summarise()` has grouped output by 'Repetition'. You can override using the `.groups` argument.
+: # A tibble: 2 × 3
+:   Setting  AvgMakespan MedianMakespan
+:   <chr>          <dbl>          <dbl>
+: 1 original        4.53           4.53
+: 2 tuned           4.91           4.89
+
+Bar plot
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1000 :height 400 :session *R*
+df.6.5.makespan %>%
+  mutate(CacheSize = as.factor(CacheSize),
+         Threads = as.factor(Threads)) %>%
+  ggplot(aes(x=Threads, y=AvgMakespan, fill=CacheSize)) +
+  geom_bar(stat="identity", width=.8, position = "dodge") +
+  facet_wrap(~Scheduler) +
+  theme_bw() 
+#+end_src
+
+For caching speedup
+#+begin_src R :results output :session *R* :exports both
+df.6.5.makespan %>%
+  ungroup() %>%
+  #filter(CacheSize != 0) %>%
+  group_by(Threads, Scheduler) %>%
+  mutate(Baseline = first(AvgMakespan),
+         Speedup = Baseline/AvgMakespan) %>%
+  select(Threads, Scheduler, CacheSize, Speedup) %>%
+  print() -> df.6.5.speedup
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 48 × 4
+# Groups:   Threads, Scheduler [16]
+   Threads Scheduler CacheSize Speedup
+     <int> <chr>         <int>   <dbl>
+ 1       1 omp               0    1   
+ 2       1 omp             256    1.10
+ 3       1 omp            2048    1.08
+ 4       1 ws                0    1   
+ 5       1 ws              256    1.12
+ 6       1 ws             2048    1.12
+ 7       2 omp               0    1   
+ 8       2 omp             256    1.10
+ 9       2 omp            2048    1.09
+10       2 ws                0    1   
+# ℹ 38 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+Line plot
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1000 :height 400 :session *R*
+df.5.2.speedup %>%
+  ggplot(aes(x=Threads, y=Speedup, color=Scheduler)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous("Threads", breaks=df.5.2.speedup$Threads) +
+  facet_wrap(~InputSet) +
+  theme_bw() +
+  theme(legend.position = "top",
+        text = element_text(size = 20),
+        axis.text.y = element_text(angle = 45, hjust = 1, size=15),
+        axis.text.x = element_text(angle = 45, hjust = 1, size=15))
+#+end_src
+
+
+** Understanding how many nodes I access per thread
+Joseph's idea to check if the number of nodes being accessed by each
+thread is different
+Script to test will be on pipeline-7-1.py
+#+begin_src R :results output :session *R* :exports both
+#!/usr/bin/env Rscript
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+args = commandArgs(trailingOnly=TRUE)
+file = args[1]
+new_file = args[2]
+
+df <- read_csv(file,
+               skip=3,
+               skip_footer = 3,
+               progress=FALSE,
+               col_names=TRUE,
+               col_types=cols()) %>%
+  rename(Sequence = X1, Node = X2, Thread = X3)
+
+df %>%
+  group_by(Thread) %>%
+  summarize(Total = n()) %>%
+  write_csv(new_file)
+#+end_src
+
+#+begin_src R :results output :session *R* :exports both
+options(crayon.enabled = FALSE)
+suppressMessages(library(tidyverse))
+suppressMessages(library(stringr))
+
+read_traces <- function(file) {
+  read_csv(file,
+           skip = 3,
+           progress=FALSE,
+           col_names=FALSE,
+           col_types=cols()) %>%
+    rename(Sequence = X1, Node = X2, Thread = X3)
+}
+#+end_src
+
+#+RESULTS:
+
+#+begin_src R :results output :session *R* :exports both
+FOLDER="/soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7-1"
+df <- tibble(SOURCE = list.files(FOLDER,
+                                 pattern="parsed",
+                                 recursive=TRUE,
+                                 full.names=TRUE)
+             )
+df
+#+end_src
+
+#+RESULTS:
+: # A tibble: 3 × 1
+:   SOURCE                                                                                                                    
+:   <chr>                                                                                                                     
+: 1 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7-1/256_48_omp_0_nodes_per_thread_4096_parsed.c…
+: 2 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7-1/256_72_omp_0_nodes_per_thread_4096_parsed.c…
+: 3 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/7-1/256_96_omp_0_nodes_per_thread_4096_parsed.c…
+
+#+begin_src R :results output :session *R* :exports both
+df %>%
+    mutate(DATA = map(SOURCE, read_traces)) %>%
+    separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "EXP"), sep="/") %>%
+    separate(EXP, c("Batch", "Threads", "Scheduler", "XX8", "XX9", "XX10", "XX11", "Cache", "XX12"), sep="_") %>%
+    select(-contains("XX")) %>%
+    unnest(DATA) %>%
+    print() -> df.7.1
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 129,040,899 × 7
+   Batch Threads Scheduler Cache Sequence                                                                        Node Thread
+   <chr> <chr>   <chr>     <chr> <chr>                                                                          <dbl>  <dbl>
+ 1 256   48      omp       4096  CCTCTGACCTTGAGGTCACCCTTTGGCCAATGACCTTCCATTGCTAAAGGAAATCAGGAAGCTCATAGGTTACGGT… 2.12e8      0
+ 2 256   48      omp       4096  CCTCTGACCTTGAGGTCACCCTTTGGCCAATGACCTTCCATTGCTAAAGGAAATCAGGAAGCTCATAGGTTACGGT… 2.12e8      0
+ 3 256   48      omp       4096  CCTCTGACCTTGAGGTCACCCTTTGGCCAATGACCTTCCATTGCTAAAGGAAATCAGGAAGCTCATAGGTTACGGT… 2.12e8      0
+ 4 256   48      omp       4096  TTTGTTACACAGGTATACATGTGCCATGATGGTTTGCTGCACCCATCAACCCGTCATCTAGGTTTTAAGCCCTGCA… 5.78e8     31
+ 5 256   48      omp       4096  TTTGTTACACAGGTATACATGTGCCATGATGGTTTGCTGCACCCATCAACCCGTCATCTAGGTTTTAAGCCCTGCA… 5.78e8     31
+ 6 256   48      omp       4096  TACATATTACATATAAAGCATATTCCATAACATATAGTATATATCATATATAATTTTTTTTCAGACAGAGTCTTGT… 5.86e8     37
+ 7 256   48      omp       4096  TACATATTACATATAAAGCATATTCCATAACATATAGTATATATCATATATAATTTTTTTTCAGACAGAGTCTTGT… 5.86e8     37
+ 8 256   48      omp       4096  CTCAAGCAAGTCAACATTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGTTGGGTGTGGCAAGAATT… 4.82e8     21
+ 9 256   48      omp       4096  CTCAAGCAAGTCAACATTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGTTGGGTGTGGCAAGAATT… 4.82e8     21
+10 256   48      omp       4096  CTCAAGCAAGTCAACATTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGTTGGGTGTGGCAAGAATT… 4.23e8     27
+# ℹ 129,040,889 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1 %>%
+  group_by(Threads, Thread) %>%
+  summarize(Total = n()) %>%
+  print() -> df.7.1.total
+#+end_src
+
+#+RESULTS:
+#+begin_example
+`summarise()` has grouped output by 'Threads'. You can override using the `.groups` argument.
+# A tibble: 216 × 3
+# Groups:   Threads [3]
+   Threads Thread  Total
+   <chr>    <dbl>  <int>
+ 1 48           0 907781
+ 2 48           1 907143
+ 3 48           2 879303
+ 4 48           3 909030
+ 5 48           4 887059
+ 6 48           5 900965
+ 7 48           6 884993
+ 8 48           7 893584
+ 9 48           8 899946
+10 48           9 899441
+# ℹ 206 more rows
+# ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1000 :height 400 :session *R*
+df.7.1.total %>%
+  ggplot(aes(x=Thread, y=Total)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~Threads, scales="free_x") +
+  theme_bw()
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-6kpow7/figureUxkXsY.png]]
+

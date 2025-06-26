@@ -6523,6 +6523,8 @@ Ran on Jun 4
 Ran on ?
 *** Grch38
 Ran on Jun 5
+*** Grch38_random
+New addition!
 *** Chm13
 Ran on ?
 
@@ -6557,7 +6559,7 @@ df
 
 #+RESULTS:
 #+begin_example
-# A tibble: 450 × 1
+# A tibble: 502 × 1
    SOURCE                                                                                                               
    <chr>                                                                                                                
  1 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_omp_0_tuning_1024.csv
@@ -6570,9 +6572,10 @@ df
  8 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_ws_0_tuning_128.csv  
  9 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_ws_0_tuning_2048.csv 
 10 /soe/jessicadagostini/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning/1000GP/1024_48_ws_0_tuning_256.csv  
-# ℹ 440 more rows
+# ℹ 492 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
+
 
 #+begin_src R :results output :session *R* :exports both
 df %>%
@@ -6592,7 +6595,7 @@ df %>%
 
 #+RESULTS:
 #+begin_example
-# A tibble: 33,516 × 10
+# A tibble: 38,612 × 10
    InputSet Batches Threads Scheduler Repetition Test   CacheSize Query         Runtime Thread
    <chr>      <int>   <int> <chr>          <int> <chr>      <int> <chr>           <dbl>  <dbl>
  1 1000GP      1024      48 omp                0 tuning      1024 reading-gbz    44.9        0
@@ -6605,7 +6608,7 @@ df %>%
  8 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      1.00       5
  9 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      0.997      6
 10 1000GP      1024      48 omp                0 tuning      1024 seeds-loop      1.01       7
-# ℹ 33,506 more rows
+# ℹ 38,602 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
 
@@ -6622,8 +6625,8 @@ df.7.1 %>%
 #+begin_example
 `summarise()` has grouped output by 'InputSet', 'Batches', 'Threads', 'Scheduler', 'Repetition', 'CacheSize'. You can
 override using the `.groups` argument.
-# A tibble: 450 × 8
-# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [442]
+# A tibble: 502 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [492]
    InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
    <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
  1 1000GP       128      48 omp                0       128 tuning    1.06 
@@ -6636,35 +6639,74 @@ override using the `.groups` argument.
  8 1000GP       128      48 ws                 0       256 tuning    1.01 
  9 1000GP       128      48 ws                 0       512 tuning    1.01 
 10 1000GP       128      48 ws                 0      1024 tuning    0.994
-# ℹ 440 more rows
+# ℹ 492 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
 
 #+begin_src R :results output :session *R* :exports both
 df.7.1.makespan %>%
-  filter(InputSet == "chm13" & Test == "tuning") %>%
+  filter(InputSet == "chm13" & Test == "tuning" & Threads == 96) %>%
   print() -> df.7.1.chm13
 #+end_src
 
 #+RESULTS:
 #+begin_example
-# A tibble: 102 × 8
-# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [102]
+# A tibble: 50 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [50]
    InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
    <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl>
- 1 chm13        128      48 omp                0       256 tuning     51.0
- 2 chm13        128      48 omp                0       512 tuning     49.4
- 3 chm13        128      48 omp                0      1024 tuning     50.3
- 4 chm13        128      48 omp                0      2048 tuning     51.8
- 5 chm13        128      48 omp                0      4096 tuning     49.7
- 6 chm13        128      48 ws                 0       256 tuning     56.6
- 7 chm13        128      48 ws                 0       512 tuning     74.4
- 8 chm13        128      48 ws                 0      1024 tuning     57.0
- 9 chm13        128      48 ws                 0      2048 tuning     68.1
-10 chm13        128      48 ws                 0      4096 tuning     64.8
-# ℹ 92 more rows
+ 1 chm13        128      96 omp                0       256 tuning     41.4
+ 2 chm13        128      96 omp                0       512 tuning     37.0
+ 3 chm13        128      96 omp                0      1024 tuning     37.7
+ 4 chm13        128      96 omp                0      2048 tuning     34.5
+ 5 chm13        128      96 omp                0      4096 tuning     38.6
+ 6 chm13        128      96 ws                 0       256 tuning     42.2
+ 7 chm13        128      96 ws                 0       512 tuning     36.5
+ 8 chm13        128      96 ws                 0      1024 tuning     37.7
+ 9 chm13        128      96 ws                 0      2048 tuning     36.6
+10 chm13        128      96 ws                 0      4096 tuning     37.1
+# ℹ 40 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.1.chm13 %>%
+  mutate(Batches = as.factor(Batches),
+         Scheduler = as.factor(Scheduler),
+         CacheSize = as.factor(CacheSize)) %>%
+  print() -> df.anova
+
+  model <- aov(Makespan ~ Batches + Scheduler + CacheSize, data = df.anova)
+  summary(model)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 50 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [50]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>    <fct>     <int> <fct>          <int> <fct>     <chr>     <dbl>
+ 1 chm13    128          96 omp                0 256       tuning     41.4
+ 2 chm13    128          96 omp                0 512       tuning     37.0
+ 3 chm13    128          96 omp                0 1024      tuning     37.7
+ 4 chm13    128          96 omp                0 2048      tuning     34.5
+ 5 chm13    128          96 omp                0 4096      tuning     38.6
+ 6 chm13    128          96 ws                 0 256       tuning     42.2
+ 7 chm13    128          96 ws                 0 512       tuning     36.5
+ 8 chm13    128          96 ws                 0 1024      tuning     37.7
+ 9 chm13    128          96 ws                 0 2048      tuning     36.6
+10 chm13    128          96 ws                 0 4096      tuning     37.1
+# ℹ 40 more rows
+# ℹ Use `print(n = ...)` to see more rows
+            Df Sum Sq Mean Sq F value  Pr(>F)   
+Batches      4  42.86  10.715   3.877 0.00940 **
+Scheduler    1   5.84   5.844   2.114 0.15372   
+CacheSize    4  54.14  13.535   4.897 0.00261 **
+Residuals   40 110.56   2.764                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#+end_example
+
 
 #+begin_src R :results output :session *R* :exports both
 df.7.1.chm13 %>%
@@ -6840,7 +6882,33 @@ df.7.1.grch38 %>%
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-m6pXWy/figuretVzRy1.png]]
+[[file:/tmp/babel-TluOQF/figureRDKLwb.png]]
+
+#+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 600 :height 400 :session *R*
+p <- df.7.1.grch38 %>%
+  mutate(Batches = as.factor(Batches),
+         CacheSize = as.factor(CacheSize)) %>%
+  filter(Threads == 96) %>%
+  ggplot(aes(x=Batches, y=Makespan, color=CacheSize, fill=Scheduler)) +
+  geom_point(aes(shape=Scheduler),size=5) +
+  geom_line(aes(x=as.numeric(Batches))) +
+  labs(y="Makespan (sec)", color="Initial Cache", fill="Scheduler", shape="Scheduler") +
+  #scale_color_manual(values=colors_list) +
+  #facet_wrap(~TestCase, nrow=2) +
+  theme_bw() +
+  theme(legend.position = "top",
+        legend.text=element_text(size=18),
+        text = element_text(size = 16),
+        axis.text.x = element_text(angle = 25, hjust = 1, size=16))
+p
+#+end_src
+
+#+RESULTS:
+[[file:/tmp/babel-TluOQF/figure0EQYmP.png]]
+#+begin_src R :results graphics file :file  :exports both :width 600 :height 400 :session *R*
+
+#+end_src
+
 
 #+begin_src R :results output :session *R* :exports both
 df.7.1.grch38 %>%
@@ -6890,18 +6958,20 @@ df.7.1.makespan %>%
 
 #+RESULTS:
 #+begin_example
-wrote 1.00TB in  0s, 47.66PB/s                                                                                                                          # A tibble: 8 × 10
-# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [8]
-  InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine     Execution
-  <chr>      <int>   <int> <chr>          <int>     <int> <chr>    <dbl> <chr>       <chr>    
-1 1000GP       256      96 omp                0      4096 full      6.96 local-intel Tunned   
-2 1000GP       512      96 omp                0       256 full     10.3  local-intel Original 
-3 chm13        128      96 omp                0      2048 full    700.   local-intel Tunned   
-4 chm13        512      96 omp                0       256 full    675.   local-intel Original 
-5 grch38       256      96 omp                0      4096 full     70.6  local-intel Tunned   
-6 grch38       512      96 omp                0       256 full     67.9  local-intel Original 
-7 yeast        128      96 ws                 0       512 full    115.   local-intel Tunned   
-8 yeast        512      96 omp                0       256 full    118.   local-intel Original
+wrote 1.00TB in  0s, 19.97PB/s                                                                                                                          # A tibble: 10 × 10
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [10]
+   InputSet      Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine     Execution
+   <chr>           <int>   <int> <chr>          <int>     <int> <chr>    <dbl> <chr>       <chr>    
+ 1 1000GP            256      96 omp                0      4096 full      6.96 local-intel Tunned   
+ 2 1000GP            512      96 omp                0       256 full     10.3  local-intel Original 
+ 3 chm13             128      96 omp                0      2048 full    700.   local-intel Tunned   
+ 4 chm13             512      96 omp                0       256 full    675.   local-intel Original 
+ 5 grch38            256      96 omp                0      4096 full     70.6  local-intel Tunned   
+ 6 grch38            512      96 omp                0       256 full     67.9  local-intel Original 
+ 7 grch38_random     128      96 omp                0      2048 full     12.6  local-intel Tunned   
+ 8 grch38_random     512      96 omp                0       256 full     29.9  local-intel Original 
+ 9 yeast             128      96 ws                 0       512 full    115.   local-intel Tunned   
+10 yeast             512      96 omp                0       256 full    118.   local-intel Original
 #+end_example
 
 #+begin_src R :results output :session *R* :exports both
@@ -6916,18 +6986,19 @@ df.7.1.makespan %>%
 
 #+RESULTS:
 #+begin_example
-# A tibble: 8 × 9
-# Groups:   InputSet, Threads [8]
-  InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting
-  <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>  
-1 1000GP       256      96 omp                0      4096 tuning    0.623 tuned  
-2 1000GP       512      48 omp                0      1024 tuning    0.936 tuned  
-3 chm13        128      96 omp                0      2048 tuning   34.5   tuned  
-4 chm13       2048      48 omp                0      4096 tuning   48.8   tuned  
-5 grch38       256      96 omp                0      4096 tuning    8.04  tuned  
-6 grch38      1024      48 omp                0       128 tuning    8.86  tuned  
-7 yeast        128      48 omp                0      4096 tuning    5.91  tuned  
-8 yeast        128      96 ws                 0       512 tuning    5.49  tuned
+# A tibble: 9 × 9
+# Groups:   InputSet, Threads [9]
+  InputSet      Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting
+  <chr>           <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>  
+1 1000GP            256      96 omp                0      4096 tuning    0.623 tuned  
+2 1000GP            512      48 omp                0      1024 tuning    0.936 tuned  
+3 chm13             128      96 omp                0      2048 tuning   34.5   tuned  
+4 chm13            2048      48 omp                0      4096 tuning   48.8   tuned  
+5 grch38            256      96 omp                0      4096 tuning    8.04  tuned  
+6 grch38           1024      48 omp                0       128 tuning    8.86  tuned  
+7 grch38_random     128      96 omp                0      2048 tuning   10.4   tuned  
+8 yeast             128      48 omp                0      4096 tuning    5.91  tuned  
+9 yeast             128      96 ws                 0       512 tuning    5.49  tuned
 #+end_example
 
 #+begin_src R :results output :session *R* :exports both
@@ -6941,19 +7012,20 @@ df.7.1.makespan %>%
 
 #+RESULTS:
 #+begin_example
-# A tibble: 9 × 9
-# Groups:   InputSet, Threads [9]
-  InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
-  <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
-1 1000GP       512      48 omp                0       256 tuning     1.08 original
-2 1000GP       512      96 omp                0       256 tuning     1.47 original
-3 chm13        512      48 omp                0       256 tuning    52.0  original
-4 chm13        512      72 omp                0       256 tuning    40.5  original
-5 chm13        512      96 omp                0       256 tuning    40.5  original
-6 grch38       512      48 omp                0       256 tuning    10.9  original
-7 grch38       512      96 omp                0       256 tuning    10.4  original
-8 yeast        512      48 omp                0       256 tuning     7.18 original
-9 yeast        512      96 omp                0       256 tuning     5.84 original
+# A tibble: 10 × 9
+# Groups:   InputSet, Threads [10]
+   InputSet      Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
+   <chr>           <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
+ 1 1000GP            512      48 omp                0       256 tuning     1.08 original
+ 2 1000GP            512      96 omp                0       256 tuning     1.47 original
+ 3 chm13             512      48 omp                0       256 tuning    52.0  original
+ 4 chm13             512      72 omp                0       256 tuning    40.5  original
+ 5 chm13             512      96 omp                0       256 tuning    40.5  original
+ 6 grch38            512      48 omp                0       256 tuning    10.9  original
+ 7 grch38            512      96 omp                0       256 tuning    10.4  original
+ 8 grch38_random     512      96 omp                0       256 tuning    16.6  original
+ 9 yeast             512      48 omp                0       256 tuning     7.18 original
+10 yeast             512      96 omp                0       256 tuning     5.84 original
 #+end_example
 
 #+begin_src R :results output :session *R* :exports both
@@ -6967,27 +7039,29 @@ df.7.1.original %>%
 
 #+RESULTS:
 #+begin_example
-# A tibble: 17 × 9
-# Groups:   InputSet, Threads [9]
-   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
-   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
- 1 1000GP       512      48 omp                0       256 tuning    1.08  original
- 2 1000GP       512      96 omp                0       256 tuning    1.47  original
- 3 chm13        512      48 omp                0       256 tuning   52.0   original
- 4 chm13        512      72 omp                0       256 tuning   40.5   original
- 5 chm13        512      96 omp                0       256 tuning   40.5   original
- 6 grch38       512      48 omp                0       256 tuning   10.9   original
- 7 grch38       512      96 omp                0       256 tuning   10.4   original
- 8 yeast        512      48 omp                0       256 tuning    7.18  original
- 9 yeast        512      96 omp                0       256 tuning    5.84  original
-10 1000GP       256      96 omp                0      4096 tuning    0.623 tuned   
-11 1000GP       512      48 omp                0      1024 tuning    0.936 tuned   
-12 chm13        128      96 omp                0      2048 tuning   34.5   tuned   
-13 chm13       2048      48 omp                0      4096 tuning   48.8   tuned   
-14 grch38       256      96 omp                0      4096 tuning    8.04  tuned   
-15 grch38      1024      48 omp                0       128 tuning    8.86  tuned   
-16 yeast        128      48 omp                0      4096 tuning    5.91  tuned   
-17 yeast        128      96 ws                 0       512 tuning    5.49  tuned
+# A tibble: 19 × 9
+# Groups:   InputSet, Threads [10]
+   InputSet      Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting 
+   <chr>           <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>   
+ 1 1000GP            512      48 omp                0       256 tuning    1.08  original
+ 2 1000GP            512      96 omp                0       256 tuning    1.47  original
+ 3 chm13             512      48 omp                0       256 tuning   52.0   original
+ 4 chm13             512      72 omp                0       256 tuning   40.5   original
+ 5 chm13             512      96 omp                0       256 tuning   40.5   original
+ 6 grch38            512      48 omp                0       256 tuning   10.9   original
+ 7 grch38            512      96 omp                0       256 tuning   10.4   original
+ 8 grch38_random     512      96 omp                0       256 tuning   16.6   original
+ 9 yeast             512      48 omp                0       256 tuning    7.18  original
+10 yeast             512      96 omp                0       256 tuning    5.84  original
+11 1000GP            256      96 omp                0      4096 tuning    0.623 tuned   
+12 1000GP            512      48 omp                0      1024 tuning    0.936 tuned   
+13 chm13             128      96 omp                0      2048 tuning   34.5   tuned   
+14 chm13            2048      48 omp                0      4096 tuning   48.8   tuned   
+15 grch38            256      96 omp                0      4096 tuning    8.04  tuned   
+16 grch38           1024      48 omp                0       128 tuning    8.86  tuned   
+17 grch38_random     128      96 omp                0      2048 tuning   10.4   tuned   
+18 yeast             128      48 omp                0      4096 tuning    5.91  tuned   
+19 yeast             128      96 ws                 0       512 tuning    5.49  tuned
 #+end_example
 
 #+begin_src R :results output :session *R* :exports both
@@ -7020,18 +7094,19 @@ print(improvement.7.1)
 
 #+RESULTS:
 #+begin_example
-# A tibble: 8 × 5
-# Groups:   InputSet, Threads [8]
-  InputSet Threads original  tuned Percent
-  <chr>      <int>    <dbl>  <dbl>   <dbl>
-1 1000GP        48     1.08  0.936   13.6 
-2 1000GP        96     1.47  0.623   57.6 
-3 chm13         48    52.0  48.8      6.05
-4 chm13         96    40.5  34.5     14.9 
-5 grch38        48    10.9   8.86    18.9 
-6 grch38        96    10.4   8.04    22.5 
-7 yeast         48     7.18  5.91    17.7 
-8 yeast         96     5.84  5.49     6.03
+# A tibble: 9 × 5
+# Groups:   InputSet, Threads [9]
+  InputSet      Threads original  tuned Percent
+  <chr>           <int>    <dbl>  <dbl>   <dbl>
+1 1000GP             48     1.08  0.936   13.6 
+2 1000GP             96     1.47  0.623   57.6 
+3 chm13              48    52.0  48.8      6.05
+4 chm13              96    40.5  34.5     14.9 
+5 grch38             48    10.9   8.86    18.9 
+6 grch38             96    10.4   8.04    22.5 
+7 grch38_random      96    16.6  10.4     37.0 
+8 yeast              48     7.18  5.91    17.7 
+9 yeast              96     5.84  5.49     6.03
 #+end_example
 
 #+begin_src R :results output :session *R* :exports both
@@ -7045,26 +7120,28 @@ df.7.1.compare %>%
 
 #+RESULTS:
 #+begin_example
-wrote 1.00TB in  0s, 55.19PB/s                                                                                                                          # A tibble: 16 × 10
-# Groups:   InputSet, Threads [8]
-   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting  Percent
-   <chr>      <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>      <dbl>
- 1 1000GP       512      48 omp                0       256 tuning    1.08  original   13.6 
- 2 1000GP       512      96 omp                0       256 tuning    1.47  original   57.6 
- 3 chm13        512      48 omp                0       256 tuning   52.0   original    6.05
- 4 chm13        512      96 omp                0       256 tuning   40.5   original   14.9 
- 5 grch38       512      48 omp                0       256 tuning   10.9   original   18.9 
- 6 grch38       512      96 omp                0       256 tuning   10.4   original   22.5 
- 7 yeast        512      48 omp                0       256 tuning    7.18  original   17.7 
- 8 yeast        512      96 omp                0       256 tuning    5.84  original    6.03
- 9 1000GP       256      96 omp                0      4096 tuning    0.623 tuned      57.6 
-10 1000GP       512      48 omp                0      1024 tuning    0.936 tuned      13.6 
-11 chm13        128      96 omp                0      2048 tuning   34.5   tuned      14.9 
-12 chm13       2048      48 omp                0      4096 tuning   48.8   tuned       6.05
-13 grch38       256      96 omp                0      4096 tuning    8.04  tuned      22.5 
-14 grch38      1024      48 omp                0       128 tuning    8.86  tuned      18.9 
-15 yeast        128      48 omp                0      4096 tuning    5.91  tuned      17.7 
-16 yeast        128      96 ws                 0       512 tuning    5.49  tuned       6.03
+wrote 1.00TB in  0s, 55.92PB/s                                                                                                                          # A tibble: 18 × 10
+# Groups:   InputSet, Threads [9]
+   InputSet      Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting  Percent
+   <chr>           <int>   <int> <chr>          <int>     <int> <chr>     <dbl> <chr>      <dbl>
+ 1 1000GP            512      48 omp                0       256 tuning    1.08  original   13.6 
+ 2 1000GP            512      96 omp                0       256 tuning    1.47  original   57.6 
+ 3 chm13             512      48 omp                0       256 tuning   52.0   original    6.05
+ 4 chm13             512      96 omp                0       256 tuning   40.5   original   14.9 
+ 5 grch38            512      48 omp                0       256 tuning   10.9   original   18.9 
+ 6 grch38            512      96 omp                0       256 tuning   10.4   original   22.5 
+ 7 grch38_random     512      96 omp                0       256 tuning   16.6   original   37.0 
+ 8 yeast             512      48 omp                0       256 tuning    7.18  original   17.7 
+ 9 yeast             512      96 omp                0       256 tuning    5.84  original    6.03
+10 1000GP            256      96 omp                0      4096 tuning    0.623 tuned      57.6 
+11 1000GP            512      48 omp                0      1024 tuning    0.936 tuned      13.6 
+12 chm13             128      96 omp                0      2048 tuning   34.5   tuned      14.9 
+13 chm13            2048      48 omp                0      4096 tuning   48.8   tuned       6.05
+14 grch38            256      96 omp                0      4096 tuning    8.04  tuned      22.5 
+15 grch38           1024      48 omp                0       128 tuning    8.86  tuned      18.9 
+16 grch38_random     128      96 omp                0      2048 tuning   10.4   tuned      37.0 
+17 yeast             128      48 omp                0      4096 tuning    5.91  tuned      17.7 
+18 yeast             128      96 ws                 0       512 tuning    5.49  tuned       6.03
 #+end_example
 
 #+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
@@ -7100,7 +7177,7 @@ df.7.1.compare %>%
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-m6pXWy/figureMMetpz.png]]
+[[file:/tmp/babel-TluOQF/figurezGM3GG.png]]
 
 
 ** 7.2 - Tuning on tangerine
@@ -7707,6 +7784,287 @@ df.7.3.makespan %>%
 10 grch38       128      80 ws                 0      4096 tuning     7.15
 # ℹ 90 more rows
 # ℹ Use `print(n = ...)` to see more rows
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.makespan %>%
+  filter(InputSet == "chm13" & Test == "tuning" & Threads == 160) %>%
+  ungroup() %>%
+  select(Batches, Scheduler, CacheSize, Makespan) %>%
+  print(n=50) -> df.7.3.chm13
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 50 × 4
+   Batches Scheduler CacheSize Makespan
+     <int> <chr>         <int>    <dbl>
+ 1     128 omp             256     72.8
+ 2     128 omp             512     63.8
+ 3     128 omp            1024     53.0
+ 4     128 omp            2048     44.7
+ 5     128 omp            4096     41.5
+ 6     128 ws              256     53.5
+ 7     128 ws              512     50.5
+ 8     128 ws             1024     47.7
+ 9     128 ws             2048     61.3
+10     128 ws             4096     44.4
+11     256 omp             256     53.2
+12     256 omp             512     46.8
+13     256 omp            1024     45.5
+14     256 omp            2048     47.0
+15     256 omp            4096     40.3
+16     256 ws              256     54.3
+17     256 ws              512     50.2
+18     256 ws             1024     46.9
+19     256 ws             2048     56.0
+20     256 ws             4096     53.8
+21     512 omp             256     66.5
+22     512 omp             512     52.1
+23     512 omp            1024     39.2
+24     512 omp            2048     52.7
+25     512 omp            4096     44.3
+26     512 ws              256     41.5
+27     512 ws              512     56.6
+28     512 ws             1024     55.9
+29     512 ws             2048     40.8
+30     512 ws             4096     61.7
+31    1024 omp             256     65.7
+32    1024 omp             512     63.7
+33    1024 omp            1024     40.5
+34    1024 omp            2048     42.5
+35    1024 omp            4096     41.0
+36    1024 ws              256     51.3
+37    1024 ws              512     47.4
+38    1024 ws             1024     52.1
+39    1024 ws             2048     61.2
+40    1024 ws             4096     46.1
+41    2048 omp             256     62.2
+42    2048 omp             512     69.3
+43    2048 omp            1024     46.2
+44    2048 omp            2048     42.0
+45    2048 omp            4096     46.6
+46    2048 ws              256     47.2
+47    2048 ws              512     40.4
+48    2048 ws             1024     45.4
+49    2048 ws             2048     54.2
+50    2048 ws             4096     52.3
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.chm13 %>%
+  mutate(Batches = as.factor(Batches),
+         Scheduler = as.factor(Scheduler),
+         CacheSize = as.factor(CacheSize)) %>%
+  print() -> df.anova
+
+  model <- aov(Makespan ~ Batches + Scheduler + CacheSize, data = df.anova)
+  summary(model)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 50 × 4
+   Batches Scheduler CacheSize Makespan
+   <fct>   <fct>     <fct>        <dbl>
+ 1 128     omp       256           72.8
+ 2 128     omp       512           63.8
+ 3 128     omp       1024          53.0
+ 4 128     omp       2048          44.7
+ 5 128     omp       4096          41.5
+ 6 128     ws        256           53.5
+ 7 128     ws        512           50.5
+ 8 128     ws        1024          47.7
+ 9 128     ws        2048          61.3
+10 128     ws        4096          44.4
+# ℹ 40 more rows
+# ℹ Use `print(n = ...)` to see more rows
+            Df Sum Sq Mean Sq F value Pr(>F)  
+Batches      4   81.4   20.36   0.299 0.8771  
+Scheduler    1    2.2    2.17   0.032 0.8592  
+CacheSize    4  725.0  181.25   2.658 0.0466 *
+Residuals   40 2727.2   68.18                 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.grch38 %>%
+  mutate(Batches = as.factor(Batches),
+         Scheduler = as.factor(Scheduler),
+         CacheSize = as.factor(CacheSize)) %>%
+  print() -> df.anova
+
+  model <- aov(Makespan ~ Batches + Scheduler + CacheSize, data = df.anova)
+  summary(model)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 100 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [100]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>    <fct>     <int> <fct>          <int> <fct>     <chr>     <dbl>
+ 1 grch38   128          80 omp                0 256       tuning     5.03
+ 2 grch38   128          80 omp                0 512       tuning     5.12
+ 3 grch38   128          80 omp                0 1024      tuning     4.85
+ 4 grch38   128          80 omp                0 2048      tuning     6.24
+ 5 grch38   128          80 omp                0 4096      tuning     4.80
+ 6 grch38   128          80 ws                 0 256       tuning     7.38
+ 7 grch38   128          80 ws                 0 512       tuning     6.92
+ 8 grch38   128          80 ws                 0 1024      tuning     7.36
+ 9 grch38   128          80 ws                 0 2048      tuning     7.35
+10 grch38   128          80 ws                 0 4096      tuning     7.15
+# ℹ 90 more rows
+# ℹ Use `print(n = ...)` to see more rows
+            Df Sum Sq Mean Sq F value   Pr(>F)    
+Batches      4   0.91   0.227   0.246    0.911    
+Scheduler    1  25.88  25.883  28.079 8.22e-07 ***
+CacheSize    4   2.44   0.611   0.663    0.620    
+Residuals   90  82.96   0.922                     
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.1000GP %>%
+  mutate(Batches = as.factor(Batches),
+         Scheduler = as.factor(Scheduler),
+         CacheSize = as.factor(CacheSize)) %>%
+  print() -> df.anova
+
+  model <- aov(Makespan ~ Batches + Scheduler + CacheSize, data = df.anova)
+  summary(model)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 100 × 8
+# Groups:   InputSet, Batches, Threads, Scheduler, Repetition, CacheSize [100]
+   InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan
+   <chr>    <fct>     <int> <fct>          <int> <fct>     <chr>     <dbl>
+ 1 1000GP   128          80 omp                0 256       tuning    0.473
+ 2 1000GP   128          80 omp                0 512       tuning    0.487
+ 3 1000GP   128          80 omp                0 1024      tuning    0.488
+ 4 1000GP   128          80 omp                0 2048      tuning    0.522
+ 5 1000GP   128          80 omp                0 4096      tuning    0.428
+ 6 1000GP   128          80 ws                 0 256       tuning    0.517
+ 7 1000GP   128          80 ws                 0 512       tuning    0.536
+ 8 1000GP   128          80 ws                 0 1024      tuning    0.544
+ 9 1000GP   128          80 ws                 0 2048      tuning    0.543
+10 1000GP   128          80 ws                 0 4096      tuning    0.549
+# ℹ 90 more rows
+# ℹ Use `print(n = ...)` to see more rows
+            Df Sum Sq Mean Sq F value Pr(>F)    
+Batches      4 0.0260 0.00650   0.851  0.497    
+Scheduler    1 0.1693 0.16935  22.172  9e-06 ***
+CacheSize    4 0.0023 0.00057   0.074  0.990    
+Residuals   90 0.6874 0.00764                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#+end_example
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.makespan %>%
+  filter(InputSet == "yeast" & Test == "tuning" & Threads == 160) %>%
+  ungroup() %>%
+  select(Batches, Scheduler, CacheSize, Makespan) %>%
+  print(n=50) -> df.7.3.yeast
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 50 × 4
+   Batches Scheduler CacheSize Makespan
+     <int> <chr>         <int>    <dbl>
+ 1     128 omp             256     7.99
+ 2     128 omp             512     9.82
+ 3     128 omp            1024     9.80
+ 4     128 omp            2048     6.46
+ 5     128 omp            4096     7.85
+ 6     128 ws              256     8.47
+ 7     128 ws              512     7.58
+ 8     128 ws             1024     6.15
+ 9     128 ws             2048     7.56
+10     128 ws             4096     7.07
+11     256 omp             256     6.33
+12     256 omp             512     7.65
+13     256 omp            1024     9.30
+14     256 omp            2048     8.98
+15     256 omp            4096     9.37
+16     256 ws              256    10.2 
+17     256 ws              512     6.34
+18     256 ws             1024     6.34
+19     256 ws             2048    10.0 
+20     256 ws             4096     9.36
+21     512 omp             256     9.71
+22     512 omp             512     9.47
+23     512 omp            1024     9.75
+24     512 omp            2048     8.91
+25     512 omp            4096     8.08
+26     512 ws              256     7.80
+27     512 ws              512     8.35
+28     512 ws             1024    10.8 
+29     512 ws             2048    10.3 
+30     512 ws             4096    10.9 
+31    1024 omp             256     8.53
+32    1024 omp             512     9.28
+33    1024 omp            1024     8.37
+34    1024 omp            2048    10.5 
+35    1024 omp            4096     9.15
+36    1024 ws              256     9.75
+37    1024 ws              512    10.2 
+38    1024 ws             1024    10.0 
+39    1024 ws             2048     9.46
+40    1024 ws             4096    10.3 
+41    2048 omp             256     6.62
+42    2048 omp             512     7.65
+43    2048 omp            1024     9.06
+44    2048 omp            2048     9.26
+45    2048 omp            4096     8.05
+46    2048 ws              256    10.5 
+47    2048 ws              512    11.0 
+48    2048 ws             1024    10.8 
+49    2048 ws             2048     6.92
+50    2048 ws             4096    10.6
+#+end_example
+
+
+#+begin_src R :results output :session *R* :exports both
+df.7.3.yeast %>%
+  mutate(Batches = as.factor(Batches),
+         Scheduler = as.factor(Scheduler),
+         CacheSize = as.factor(CacheSize)) %>%
+  print() -> df.anova
+
+  model <- aov(Makespan ~ Batches + Scheduler + CacheSize, data = df.anova)
+  summary(model)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 50 × 4
+   Batches Scheduler CacheSize Makespan
+   <fct>   <fct>     <fct>        <dbl>
+ 1 128     omp       256           7.99
+ 2 128     omp       512           9.82
+ 3 128     omp       1024          9.80
+ 4 128     omp       2048          6.46
+ 5 128     omp       4096          7.85
+ 6 128     ws        256           8.47
+ 7 128     ws        512           7.58
+ 8 128     ws        1024          6.15
+ 9 128     ws        2048          7.56
+10 128     ws        4096          7.07
+# ℹ 40 more rows
+# ℹ Use `print(n = ...)` to see more rows
+            Df Sum Sq Mean Sq F value Pr(>F)  
+Batches      4  20.11   5.028   2.784 0.0394 *
+Scheduler    1   2.37   2.365   1.310 0.2593  
+CacheSize    4   1.64   0.411   0.228 0.9213  
+Residuals   40  72.24   1.806                 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 #+end_example
 
 #+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 1200 :height 600 :session *R*
@@ -8367,7 +8725,8 @@ df %>%
          InputSet = case_when(InputSet == "1000GP" ~ "A-human",
                               InputSet == "yeast" ~ "B-yeast",
                               InputSet == "chm13" ~ "D-HPRC",
-                              InputSet == "grch38" ~ "C-HPRC")) %>%
+                              InputSet == "grch38" ~ "C-HPRC",
+                              InputSet == "grch38_random" ~ "C-HPRC-ran")) %>%
   mutate(Setting = case_when(Execution == "Tunned" ~ "Tuned",
                              TRUE ~ Execution)) %>%
  print() -> df.7
@@ -8375,7 +8734,7 @@ df %>%
 
 #+RESULTS:
 #+begin_example
-# A tibble: 28 × 11
+# A tibble: 30 × 11
    InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine   Execution Setting 
    <chr>      <dbl>   <dbl> <chr>          <dbl>     <dbl> <chr>    <dbl> <chr>     <chr>     <chr>   
  1 A-human      512     128 omp                0       256 full      1.64 local-amd Original  Original
@@ -8388,7 +8747,7 @@ df %>%
  8 B-yeast      512     128 omp                0       256 full     42.5  local-amd Original  Original
  9 A-human      256      64 omp                0      4096 full      7.80 chi-arm   Tunned    Tuned   
 10 A-human      512      64 omp                0       256 full     11.4  chi-arm   Original  Original
-# ℹ 18 more rows
+# ℹ 20 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
 
@@ -8407,11 +8766,11 @@ df.7 %>%
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-67x5qJ/figureMrIJVQ.png]]
+[[file:/tmp/babel-TluOQF/figure3xhXWB.png]]
 
 #+begin_src R :results output :session *R* :exports both
 df.7 %>%
-  filter(InputSet %in% c("A-human", "D-HPRC"),
+  filter(InputSet %in% c("C-HPRC", "C-HPRC-ran"),
          Machine %in% c("local-amd", "local-intel")) %>%
   select(-Execution) %>%
   group_by(InputSet, Machine) %>%
@@ -8423,26 +8782,24 @@ df.7 %>%
 
 #+RESULTS:
 #+begin_example
-# A tibble: 8 × 12
-# Groups:   InputSet, Machine [4]
-  InputSet Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine     Setting  Baseline Speedup
-  <chr>      <dbl>   <dbl> <chr>          <dbl>     <dbl> <chr>    <dbl> <chr>       <chr>       <dbl>   <dbl>
-1 A-human      512     128 omp                0       256 full      1.64 local-amd   Original     1.64   1    
-2 D-HPRC       512     128 omp                0       256 full    237.   local-amd   Original   237.     1    
-3 A-human      512      96 omp                0       256 full     10.3  local-intel Original    10.3    1    
-4 D-HPRC       512      96 omp                0       256 full    675.   local-intel Original   675.     1    
-5 A-human      512     128 omp                0      2048 full      1.58 local-amd   Tuned        1.64   1.03 
-6 D-HPRC      1024     128 omp                0      4096 full    224.   local-amd   Tuned      237.     1.06 
-7 A-human      256      96 omp                0      4096 full      6.96 local-intel Tuned       10.3    1.48 
-8 D-HPRC       128      96 omp                0      2048 full    700.   local-intel Tuned      675.     0.964
+# A tibble: 6 × 12
+# Groups:   InputSet, Machine [3]
+  InputSet   Batches Threads Scheduler Repetition CacheSize Test  Makespan Machine     Setting  Baseline Speedup
+  <chr>        <dbl>   <dbl> <chr>          <dbl>     <dbl> <chr>    <dbl> <chr>       <chr>       <dbl>   <dbl>
+1 C-HPRC         512     128 omp                0       256 full      23.8 local-amd   Original     23.8   1    
+2 C-HPRC         512      96 omp                0       256 full      67.9 local-intel Original     67.9   1    
+3 C-HPRC-ran     512      96 omp                0       256 full      29.9 local-intel Original     29.9   1    
+4 C-HPRC         128     128 omp                0      4096 full      23.4 local-amd   Tuned        23.8   1.02 
+5 C-HPRC         256      96 omp                0      4096 full      70.6 local-intel Tuned        67.9   0.962
+6 C-HPRC-ran     128      96 omp                0      2048 full      12.6 local-intel Tuned        29.9   2.38
 #+end_example
 
 #+begin_src R :results graphics file :file (org-babel-temp-file "figure" ".png") :exports both :width 700 :height 300 :session *R*
-p <- df.7.plot %>%
+p <- df.7.plot %>%c
   filter(Machine %in% c("local-intel", "local-amd")) %>%
   ggplot(aes(x=Machine, y=Makespan, fill=Setting)) +
   geom_bar(stat = "identity", width = 0.8, position = "dodge") +
-  facet_wrap(~InputSet, ncol=2, scales="free") +
+  facet_wrap(~InputSet, ncol=3, scales="free") +
   geom_text(
     # This is the key part:
     # We filter the data for this layer to only include 'original' executions
@@ -8471,7 +8828,7 @@ p
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-67x5qJ/figurebZoYm9.png]]
+[[file:/tmp/babel-TluOQF/figureXd4t4g.png]]
 
 #+begin_src R :results graphics file :file ./iiswc25/img/full-size-tuning.pdf :exports both :width 7 :height 3 :session *R*
 p
@@ -8662,7 +9019,7 @@ df %>%
 
 #+RESULTS:
 #+begin_example
-# A tibble: 56 × 11
+# A tibble: 58 × 11
    Machine     InputSet Batches Threads Scheduler Repetition CacheSize Test   Makespan Setting  Percent
    <chr>       <chr>      <dbl>   <dbl> <chr>          <dbl>     <dbl> <chr>     <dbl> <chr>      <dbl>
  1 local-amd   A-human      512      64 omp                0       256 tuning    0.300 original   14.0 
@@ -8710,7 +9067,7 @@ df %>%
 43 local-intel D-HPRC       512      48 omp                0       256 tuning   52.0   original    6.05
 44 local-intel D-HPRC       512      96 omp                0       256 tuning   40.5   original   14.9 
 45 local-intel C-HPRC       512      48 omp                0       256 tuning   10.9   original   18.9 
-# ℹ 11 more rows
+# ℹ 13 more rows
 # ℹ Use `print(n = ...)` to see more rows
 #+end_example
 
@@ -8746,7 +9103,7 @@ df.7.compare %>%
 #+end_src
 
 #+RESULTS:
-[[file:/tmp/babel-kOBy2I/figureN7BYfi.png]]
+[[file:/tmp/babel-TluOQF/figure02iQ65.png]]
 #+begin_src R :results output :session *R* :exports both
 df.7.compare %>%
   filter(Setting == "tuned") %>%

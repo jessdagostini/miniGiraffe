@@ -1,1 +1,1 @@
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/miniGiraffe-amd/deps/gbwt/lib:$HOME/miniGiraffe-amd/deps/libhandlegraph/build/usr/local/lib:$HOME/miniGiraffe-amd/deps/sdsl-lite/lib:$HOME/miniGiraffe-amd/deps/gbwtgraph/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/miniGiraffe/deps/gbwt/lib:$HOME/miniGiraffe/deps/libhandlegraph/build/usr/local/lib:$HOME/miniGiraffe/deps/sdsl-lite/lib:$HOME/miniGiraffe/deps/gbwtgraph/lib

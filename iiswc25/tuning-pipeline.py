@@ -8,10 +8,23 @@ source_folder = "/soe/jessicadagostini/miniGiraffe"
 destination_folder = "/lscratch/jessicadagostini/miniGiraffe"
 pipeline = MiniGiraffePipeline(source_folder, destination_folder)
 
-# Get the input files from args
-sequence_path = sys.argv[1]
-gbz_path = sys.argv[2]
-input_set = sys.argv[3]
+sequence_path = ""
+gbz_path = ""
+input_set = ""
+
+# Try to get the input files from args
+if len(sys.argv) < 4:
+    # Download test case
+    pipeline.download_zenodo_record(14990368)
+
+    # Setup paths
+    sequence_path = os.path.join(pipeline.destination_folder, "dump_proxy_novaseq.bin")
+    gbz_path = os.path.join(pipeline.destination_folder, "1000GPlons_hs38d1_filter.giraffe.gbz")
+    input_set = "1000GP"
+else:
+    sequence_path = sys.argv[1]
+    gbz_path = sys.argv[2]
+    input_set = sys.argv[3]
 
 pipeline.logger.info(f"[Main] Sequence path: {sequence_path}")
 pipeline.logger.info(f"[Main] GBZ path: {gbz_path}")
@@ -27,8 +40,8 @@ for file in mG_files:
     pipeline.copy_files(source_path, pipeline.destination_folder)
 
 # Lower sequence input to run testing
-#pipeline.logger.info("[Main] Lowering sequence input for testing")
-#sequence_path_lowered = pipeline.lower_sequence_input(sequence_path)
+pipeline.logger.info("[Main] Lowering sequence input for testing")
+sequence_path_lowered = pipeline.lower_sequence_input(sequence_path)
 
 # Setup the environment with paths
 env_path = os.environ.copy()

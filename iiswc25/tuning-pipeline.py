@@ -4,8 +4,8 @@ import pandas as pd
 from MiniGiraffePipeline import MiniGiraffePipeline
 
 # Setup pipeline
-source_folder = "/soe/jessicadagostini/miniGiraffe"
-destination_folder = "/lscratch/jessicadagostini/miniGiraffe"
+source_folder = os.path.join(os.getenv('HOME'), "miniGiraffe")
+destination_folder = os.path.join(os.getenv('HOME'), "miniGiraffe", "iiswc25")
 pipeline = MiniGiraffePipeline(source_folder, destination_folder)
 
 sequence_path = ""

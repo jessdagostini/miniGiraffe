@@ -246,7 +246,7 @@ class MiniGiraffePipeline:
         ]
 
         # 1. Generate the systematic (non-randomized) design
-        design_matrix_indexed = pyDOE2.fullfact(factor_level_counts)
+        design_matrix_indexed = pyDOE3.fullfact(factor_level_counts)
 
         # Map indexed design to actual factor values
         all_actual_levels = [

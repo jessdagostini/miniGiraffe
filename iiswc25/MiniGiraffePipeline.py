@@ -6,6 +6,7 @@ import io
 import logging
 import logging.handlers
 import requests
+import sys
 
 class MiniGiraffePipeline:
     def __init__(self, source_folder, destination_folder, stdout = True, log_filename="miniGiraffe.log"):

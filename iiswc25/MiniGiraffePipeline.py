@@ -234,7 +234,7 @@ class MiniGiraffePipeline:
         """
         Generate a systematic design matrix based on the provided factor levels.
         """
-        import pyDOE2
+        import pyDOE3
         import pandas as pd
         import numpy as np
 

@@ -8,11 +8,11 @@ import logging.handlers
 import requests
 
 class MiniGiraffePipeline:
-    def __init__(self, source_folder, destination_folder, log_filename="miniGiraffe.log"):
+    def __init__(self, source_folder, destination_folder, stdout = True, log_filename="miniGiraffe.log"):
         # Define global variables
         self.tmp_stdout = "./tmp_stdout.txt"
         self.tmp_stderr = "./tmp_stderr.txt"
-        self.logger = self.configure_log(log_filename)
+        self.logger = self.configure_log(log_filename, stdout)
 
         self.logger.info("***Starting miniGiraffe pipeline***")
 
@@ -22,7 +22,7 @@ class MiniGiraffePipeline:
         self.logger.info(f"[Main] Destination folder: {self.destination_folder}")
         self.prepare_destination_folder()
 
-    def configure_log(self, LOG_FILENAME):
+    def configure_log(self, LOG_FILENAME, stdout):
         logger = logging.getLogger('miniGiraffe')
         logger.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(asctime)s %(module)s - %(levelname)s - %(message)s')
@@ -32,6 +32,13 @@ class MiniGiraffePipeline:
         handler.setLevel(logging.DEBUG)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+
+        # Handler for writing to stdout
+        if stdout:
+            stdout_handler = logging.StreamHandler(sys.stdout)
+            stdout_handler.setLevel(logging.DEBUG)
+            stdout_handler.setFormatter(formatter)
+            logger.addHandler(stdout_handler)
         return logger
 
     def copy_files(self, source_path, destination_folder):

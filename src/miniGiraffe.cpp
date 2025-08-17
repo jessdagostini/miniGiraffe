@@ -61,7 +61,7 @@ bool write_output = false;
 uint64_t cache_capacity = 0;
 PerfEvent e;
 
-IOQueue Q[150];
+IOQueue Q[170];
 atomic_int finished_threads(0);
 
 void get_mem_usage(int openmp_thread_num) {

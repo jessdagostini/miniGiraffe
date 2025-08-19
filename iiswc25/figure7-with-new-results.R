@@ -11,7 +11,14 @@ read_traces <- function(file) {
         rename(Query = X1, Runtime = X2, Thread = X3)
 }
 
-FOLDER="/home/cc/miniGiraffe/iiswc25/intelxeonplatinum8260cpu@240ghz/tuning"
+lscpu_output <- system("lscpu", intern = TRUE)                                                                                                                                                                                             
+# Get the CPU model name                                                                                                                                                                                                                
+model_name_line <- grep("Model name:", lscpu_output, value = TRUE)                                                                                                                                                                         
+processor_model <- gsub("Model name:\\s*", "", model_name_line)                                                                                                                                                                            
+cleaned_model_name <- gsub("\\.", "", gsub(" ", "", gsub("\\(r\\)", "",                                                                                                                                                                    
+tolower(processor_model))))
+
+FOLDER <- paste("/home/cc/miniGiraffe/iiswc25", cleaned_model_name, "tuning", sep = "/")
 df <- tibble(SOURCE = list.files(FOLDER,
                                  pattern="csv",
                                  recursive=TRUE,
@@ -19,7 +26,7 @@ df <- tibble(SOURCE = list.files(FOLDER,
              )
 df %>%
   mutate(DATA = map(SOURCE, read_traces)) %>%
-  separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "XX6", "XX7", "InputSet", "EXP"), sep="/") %>%
+  separate(SOURCE, c("XX1", "XX2", "XX3", "XX4", "XX5", "Machine", "XX7", "InputSet", "EXP"), sep="/") %>%
   separate(EXP, c("Batches", "Threads", "Scheduler", "Repetition", "Test", "CacheSize"), sep="_") %>%
   mutate(CacheSize = str_replace_all(CacheSize, "([.csv])", "")) %>%
   select(-contains("XX")) %>%

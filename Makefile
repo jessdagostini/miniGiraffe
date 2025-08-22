@@ -63,6 +63,9 @@ exp-gbwt: src/exploring-gbwt-graph.cpp
 test-size: src/test-size.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
 
+lower-input: src/lower-input.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
 .PHONY: clean
 clean:
 	rm -f miniGiraffe time-utils.so perf-utils.so

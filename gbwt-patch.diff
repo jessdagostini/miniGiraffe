@@ -1,0 +1,38 @@
+Submodule deps/gbwt contains modified content
+diff --git a/deps/gbwt/include/gbwt/cached_gbwt.h b/deps/gbwt/include/gbwt/cached_gbwt.h
+index 1106abc..619f497 100644
+--- a/deps/gbwt/include/gbwt/cached_gbwt.h
++++ b/deps/gbwt/include/gbwt/cached_gbwt.h
+@@ -55,7 +55,7 @@ public:
+   ~CachedGBWT();
+ 
+   // Set single_record = true to quickly cache a single record.
+-  explicit CachedGBWT(const GBWT& gbwt_index, bool single_record = false);
++  explicit CachedGBWT(const GBWT& gbwt_index, bool single_record = false, uint64_t cache_capacity = 0);
+ 
+   void swap(CachedGBWT& another);
+   CachedGBWT& operator=(const CachedGBWT& source);
+diff --git a/deps/gbwt/src/cached_gbwt.cpp b/deps/gbwt/src/cached_gbwt.cpp
+index 56941e8..7613a8f 100644
+--- a/deps/gbwt/src/cached_gbwt.cpp
++++ b/deps/gbwt/src/cached_gbwt.cpp
+@@ -95,10 +95,16 @@ CachedGBWT::~CachedGBWT()
+ 
+ //------------------------------------------------------------------------------
+ 
+-CachedGBWT::CachedGBWT(const GBWT& gbwt_index, bool single_record) :
+-  index(&gbwt_index), cache_index((single_record ? SINGLE_CAPACITY : INITIAL_CAPACITY), invalid_edge())
++CachedGBWT::CachedGBWT(const GBWT& gbwt_index, bool single_record, uint64_t cache_capacity)
+ {
+-  this->cached_records.reserve((single_record ? SINGLE_CAPACITY : INITIAL_CAPACITY));
++  this->index = &gbwt_index;
++  if (cache_capacity == 0) {
++    this->cache_index.resize((single_record ? SINGLE_CAPACITY : INITIAL_CAPACITY), invalid_edge());
++    this->cached_records.reserve((single_record ? SINGLE_CAPACITY : INITIAL_CAPACITY));
++  } else {
++    this->cache_index.resize(cache_capacity, invalid_edge());
++    this->cached_records.reserve(cache_capacity);
++  }  
+ }
+ 
+ //------------------------------------------------------------------------------

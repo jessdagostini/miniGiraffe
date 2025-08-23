@@ -1,0 +1,42 @@
+Submodule deps/gbwtgraph contains modified content
+diff --git a/deps/gbwtgraph/include/gbwtgraph/cached_gbwtgraph.h b/deps/gbwtgraph/include/gbwtgraph/cached_gbwtgraph.h
+index 2376f33..2b2d3bd 100644
+--- a/deps/gbwtgraph/include/gbwtgraph/cached_gbwtgraph.h
++++ b/deps/gbwtgraph/include/gbwtgraph/cached_gbwtgraph.h
+@@ -32,7 +32,7 @@ public:
+   CachedGBWTGraph(CachedGBWTGraph&& source);
+   virtual ~CachedGBWTGraph();
+ 
+-  explicit CachedGBWTGraph(const GBWTGraph& graph);
++  explicit CachedGBWTGraph(const GBWTGraph& graph, uint64_t cache_capacity = 0);
+ 
+   void swap(CachedGBWTGraph& another);
+   CachedGBWTGraph& operator=(const CachedGBWTGraph& source);
+diff --git a/deps/gbwtgraph/include/gbwtgraph/gbwtgraph.h b/deps/gbwtgraph/include/gbwtgraph/gbwtgraph.h
+index 15dcba6..92dec1d 100644
+--- a/deps/gbwtgraph/include/gbwtgraph/gbwtgraph.h
++++ b/deps/gbwtgraph/include/gbwtgraph/gbwtgraph.h
+@@ -576,7 +576,7 @@ public:
+   */
+ 
+   // Return a cache for the GBWT index. Note: The cache is not thread-safe.
+-  gbwt::CachedGBWT get_cache() const { return gbwt::CachedGBWT(*(this->index), false); }
++  gbwt::CachedGBWT get_cache(uint64_t cache_capacity = 0) const { return gbwt::CachedGBWT(*(this->index), false, cache_capacity); }
+ 
+   // Return a single-node cache for the GBWT index. Mostly for internal use.
+   // Note: The cache is not thread-safe.
+diff --git a/deps/gbwtgraph/src/cached_gbwtgraph.cpp b/deps/gbwtgraph/src/cached_gbwtgraph.cpp
+index 43c9afe..51c8adc 100644
+--- a/deps/gbwtgraph/src/cached_gbwtgraph.cpp
++++ b/deps/gbwtgraph/src/cached_gbwtgraph.cpp
+@@ -62,8 +62,8 @@ CachedGBWTGraph::copy(const CachedGBWTGraph& source)
+ 
+ //------------------------------------------------------------------------------
+ 
+-CachedGBWTGraph::CachedGBWTGraph(const GBWTGraph& graph) :
+-  graph(&graph), cache(this->graph->get_cache())
++CachedGBWTGraph::CachedGBWTGraph(const GBWTGraph& graph, uint64_t cache_capacity) :
++  graph(&graph), cache(this->graph->get_cache(cache_capacity))
+ {
+ }
+ 

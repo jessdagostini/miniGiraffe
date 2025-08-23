@@ -215,7 +215,7 @@ void match_initial(GaplessExtension& match, const std::string& seq, gbwtgraph::v
                 }
                 match.read_interval.second++;
                 node_offset++;
-            }
+            }   
         }
         left -= len;
     }

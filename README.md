@@ -41,6 +41,10 @@ Options:
    -b, batch size (default: 512)
    -s, scheduler [omp, ws] (default: omp)
    -p, enable profiling (default: disabled)
+   -m <list>, comma-separated list of hardware measurement to enable (default: disabled)
+              Available counters: IPC, L1CACHE, LLCACHE, BRANCHES, DTLB, ITLB
+              Not recommended to enable more than 3 hw measurement per run
+              given hardware counters constraints
 ```
 
 To include the paths of the dependencies on `LD_LIBRARY_PATH`, you can give the following command

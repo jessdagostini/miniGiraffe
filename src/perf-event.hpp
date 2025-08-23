@@ -41,6 +41,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#include "perf-utils.h"
+
 struct PerfEvent {
 
    struct event {
@@ -56,6 +58,7 @@ struct PerfEvent {
       read_format prev;
       read_format data;
 
+
       double readCounter() {
          double multiplexingCorrection = static_cast<double>(data.time_enabled - prev.time_enabled) / static_cast<double>(data.time_running - prev.time_running);
          return static_cast<double>(data.value - prev.value) * multiplexingCorrection;
@@ -66,36 +69,11 @@ struct PerfEvent {
 
    std::vector<event> events;
    std::vector<std::string> names;
+   std::map<std::string, PerfUtilsCounters> nameToIndex;
    std::chrono::time_point<std::chrono::steady_clock> startTime;
    std::chrono::time_point<std::chrono::steady_clock> stopTime;
 
    PerfEvent() {
-      // registerCounter("cycles", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES);
-      // registerCounter("kcycles", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES, KERNEL);
-      // registerCounter("instructions", PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS);
-      // registerCounter("DTLB-access", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_DTLB|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16));
-      // registerCounter("DTLB-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_DTLB|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));
-      // registerCounter("ITLB-access", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_ITLB|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16));
-      // registerCounter("ITLB-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_ITLB|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));
-      // registerCounter("LL-access", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_ACCESS<<16));
-      // registerCounter("LL-misses", PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL|(PERF_COUNT_HW_CACHE_OP_READ<<8)|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16));
-      // registerCounter("LLC-refs", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES);
-      // registerCounter("LLC-misses", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES);
-      registerCounter("branch-issued", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS);
-      registerCounter("branch-misses", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES);
-      // registerCounter("task-clock", PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK);
-      // additional counters can be found in linux/perf_event.h
-
-      for (unsigned i=0; i<events.size(); i++) {
-         auto& event = events[i];
-         event.fd = static_cast<int>(syscall(__NR_perf_event_open, &event.pe, 0, -1, -1, 0));
-         if (event.fd < 0) {
-            std::cerr << "Error opening counter " << names[i] << std::endl;
-            events.resize(0);
-            names.resize(0);
-            return;
-         }
-      }
    }
 
    void registerCounter(const std::string& name, uint64_t type, uint64_t eventID, EventDomain domain = ALL) {
@@ -117,6 +95,17 @@ struct PerfEvent {
    }
 
    void startCounters() {
+      for (unsigned i=0; i<events.size(); i++) {
+         auto& event = events[i];
+         event.fd = static_cast<int>(syscall(__NR_perf_event_open, &event.pe, 0, -1, -1, 0));
+         if (event.fd < 0) {
+            std::cerr << "Error opening counter " << names[i] << std::endl;
+            events.resize(0);
+            names.resize(0);
+            return;
+         }
+      }
+
       for (unsigned i=0; i<events.size(); i++) {
          auto& event = events[i];
          ioctl(event.fd, PERF_EVENT_IOC_RESET, 0);

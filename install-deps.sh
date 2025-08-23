@@ -1,3 +1,5 @@
+patch -p 1 < gbwt-patch.diff
+patch -p 1 < gbwtgraph-patch.diff
 CURR_DIR=`pwd`
 cd $CURR_DIR/deps/sdsl-lite
 bash install.sh .

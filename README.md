@@ -35,7 +35,7 @@ Running miniGiraffe
 Having the input files, you can execute miniGiraffe using
 
 ```
-Usage ./miniGiraffe [/path/to/seeds/dump.bin] [/path/to/gbz/file.gbz] [options]
+./miniGiraffe [/path/to/seeds/dump.bin] [/path/to/gbz/file.gbz] [options]
 Options: 
    -t, number of threads (default: max # threads in system)
    -b, batch size (default: 512)
@@ -46,6 +46,10 @@ Options:
               Not recommended to enable more than 3 hw measurement per run
               given hardware counters constraints
 ```
+
+To include the paths of the dependencies on `LD_LIBRARY_PATH`, you can give the following command
+``` source set-env.sh```
+This will set all the paths for miniGiraffe library dependencies.
 
 There are two possible ways to run miniGiraffe in parallel. First is using OpenMP dynamic scheduler, identified as `omp`. The second is using the work-stealing scheduler identified as `ws`. Default scheduler is `omp`.
 

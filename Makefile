@@ -30,40 +30,22 @@ time-utils.so: src/time-utils.cpp
 perf-utils.so: src/perf-utils.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@
 
-handle-utils.so: src/handle-utils.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@
-
 miniGiraffe: src/miniGiraffe.cpp time-utils.so perf-utils.so handle-utils.so
 	$(CXX) -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
 
-miniGiraffeMPI: src/miniGiraffeMPI.cpp time-utils.so perf-utils.so
+miniGiraffeMPI: tests/miniGiraffeMPI.cpp time-utils.so perf-utils.so
 	mpic++ -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
 
-miniGiraffeNC: src/miniGiraffe-noCache.cpp time-utils.so perf-utils.so
-	$(CXX) -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
-
-miniGiraffeInterchange: src/miniGiraffeInterchange.cpp time-utils.so perf-utils.so
-	$(CXX) -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
-
-main-new: src/main-new.cpp
+reordering-input: tests/reordering-input.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
 
-reordering-input: src/reordering-input.cpp
+read-input: tests/read-input.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
 
-read-input: src/read-input.cpp
+get-sample: tests/get-sample.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
 
-get-sample: src/get-sample.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
-
-exp-gbwt: src/exploring-gbwt-graph.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
-
-test-size: src/test-size.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) $^ $(LDLIBS) -o $@
-
-lower-input: src/lower-input.cpp
+lower-input: tests/lower-input.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 .PHONY: clean

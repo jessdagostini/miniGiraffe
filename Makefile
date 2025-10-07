@@ -24,13 +24,7 @@ LIBS = -L$(CURR_DIR)/deps/sdsl-lite/lib \
 
 LDLIBS = -lgbwtgraph -lgbwt -lhandlegraph -lsdsl -ldivsufsort -ldivsufsort64 # -lcaliper -littnotify
 
-time-utils.so: src/time-utils.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@
-
 metric-utils.so: src/metric-utils.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@
-
-perf-utils.so: src/perf-utils.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@
 
 miniGiraffe: src/miniGiraffe.cpp metric-utils.so

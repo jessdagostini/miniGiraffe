@@ -27,13 +27,16 @@ LDLIBS = -lgbwtgraph -lgbwt -lhandlegraph -lsdsl -ldivsufsort -ldivsufsort64 # -
 time-utils.so: src/time-utils.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@
 
+metric-utils.so: src/metric-utils.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@
+
 perf-utils.so: src/perf-utils.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -shared -fPIC $(LIBS) $^ $(LDLIBS) -o $@
 
-miniGiraffe: src/miniGiraffe.cpp time-utils.so perf-utils.so handle-utils.so
+miniGiraffe: src/miniGiraffe.cpp metric-utils.so
 	$(CXX) -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
 
-miniGiraffeMPI: tests/miniGiraffeMPI.cpp time-utils.so perf-utils.so
+miniGiraffeMPI: tests/miniGiraffeMPI.cpp metric-utils.so
 	mpic++ -fopenmp -pthread -O3 -g $(INCLUDES) $(LIBS) $^ $(LDLIBS) -Wl,--emit-relocs -o $@
 
 reordering-input: tests/reordering-input.cpp

@@ -8,7 +8,13 @@ Clone this repository using the recursive option (to download dependencies from 
 
 ```git clone --recursive git@github.com:jessdagostini/miniGiraffe.git```
 
-After the download, navigate to the folder. We first install the dependencies, and then build miniGiraffe. It's about two command lines to have miniGiraffe ready to run.
+After the download, navigate to the folder. Before running the following command, make sure you have the following packages installed in your system:
+
+```
+cmake
+```
+
+With packages installed, we first install the dependencies and then build miniGiraffe. It's about two command lines to have miniGiraffe ready to run.
 
 ```
 bash install-deps.sh
